@@ -1,0 +1,360 @@
+/*
+ * Story section media panel (components/showcase/StoryVideo.tsx).
+ *
+ * The footage is stored as plain grayscale (docs/media-credits.md), so every
+ * color in this panel comes from brand tokens, laid up in three layers:
+ *   1. the clip, multiplied onto --color-primary (white becomes the brand blue)
+ *   2. a lift of white from the sunlit top (screen)
+ *   3. a dark scrim at the bottom for depth (multiply)
+ * Same token rule as everywhere: no raw color values.
+ */
+
+.story-media {
+  --story-z-toggle: 1;
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  /* on an ultrawide screen 21 / 9 is taller than the screen: the footage is cropped instead (object-fit: cover) */
+  max-height: 90svh;
+  background-color: var(--color-primary);
+}
+@media (min-width: 768px) {
+  .story-media {
+    aspect-ratio: 21 / 9;
+  }
+}
+
+.story-media__poster,
+.story-media__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  filter: brightness(1.25) contrast(1.05);
+}
+
+/* the poster stands in until the first frame of the clip is on screen */
+.story-media__poster {
+  transition: opacity 700ms var(--ease-out);
+}
+.story-media[data-started] .story-media__poster {
+  opacity: 0;
+}
+
+.story-media__lift,
+.story-media__deep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.story-media__lift {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-white) 55%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+.story-media__deep {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-dark) 38%, transparent),
+    transparent 55%
+  );
+  mix-blend-mode: multiply;
+}
+
+/* the footage settles as the panel scrolls into view (progressive enhancement) */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .story-media__poster,
+    .story-media__video {
+      animation: story-settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 55%;
+    }
+  }
+}
+@keyframes story-settle {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* pause / play: a 44px target, square to match the page's shape rule */
+.story-media__toggle {
+  position: absolute;
+  z-index: var(--story-z-toggle);
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
+  color: var(--color-white);
+  background-color: color-mix(in srgb, var(--color-dark) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-white) 32%, transparent);
+  transition:
+    color var(--btn-color),
+    transform 300ms var(--ease-out);
+}
+/* hover: the cast plate (class tide-btn, tide-button.css), the icon turning ink on it */
+.story-media__toggle:active {
+  transform: scale(0.96);
+}
+/* sits on the footage, so the focus ring is white rather than ink */
+.story-media__toggle:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 3px;
+}
+/* without script there is nothing to control */
+.story-media:not([data-ready]) .story-media__toggle {
+  display: none;
+}
+
+/*
+ * The first story section is a sheet laid over the hero's last screen (the
+ * margin that pulls it up lives with the hero's track length in underwater.css).
+ * It must paint above the sticky hero, and it opens with the water the hero ends
+ * in, so the scene hands over to the page instead of being cut off by a white edge.
+ */
+.story-sheet {
+  position: relative;
+  z-index: var(--z-sheet);
+  isolation: isolate;
+}
+
+/*
+ * The water's color where one section meets the one before it: the brand blue,
+ * thinned into the page. On :root, not on .story-sheet: every `top` water light
+ * (the categories sheet and the story section) opens with it, and a var that is
+ * not defined where it is used would void the whole wash.
+ */
+:root {
+  --story-edge: color-mix(in srgb, var(--color-primary) 17%, var(--page));
+}
+
+/* the top edge: a slow swell, in the same color the water below it begins with */
+.story-edge {
+  position: absolute;
+  inset-inline: 0;
+  bottom: calc(100% - 1px);
+  display: block;
+  width: 100%;
+  height: clamp(2.75rem, 7vw, 6.5rem);
+  pointer-events: none;
+  fill: var(--story-edge);
+}
+
+/*
+ * Water light behind a section's content (components/showcase/WaterLight.tsx).
+ * Sits at z-index -1 inside the section's own stacking context, above its
+ * background color and under everything it holds.
+ */
+.water-light {
+  position: absolute;
+  inset-inline: 0;
+  z-index: -1;
+  overflow: clip;
+  pointer-events: none;
+}
+.water-light__wash,
+.water-light__caustics {
+  position: absolute;
+  inset: 0;
+}
+
+/* — top: the swell from the hero — */
+.water-light--top {
+  top: 0;
+  height: min(100%, 1100px);
+}
+.water-light--top .water-light__wash {
+  background:
+    /* luminous cyan where the line went out of the frame, upper right (clear of the top edge, so the swell above meets a flat color) */
+    radial-gradient(
+      ellipse 54% 24% at 84% 22%,
+      color-mix(in srgb, var(--color-accent-secondary) 24%, transparent),
+      transparent 100%
+    ),
+    /* sun glare, upper left */
+    radial-gradient(
+      ellipse 50% 20% at 10% 20%,
+      color-mix(in srgb, var(--color-white) 80%, transparent),
+      transparent 100%
+    ),
+    /* the hero's water, clearing into the page */
+    linear-gradient(
+      to bottom,
+      var(--story-edge) 0%,
+      color-mix(in srgb, var(--color-primary) 9%, var(--page)) 34%,
+      var(--page) 82%
+    );
+}
+
+/* the brand mark, large and faint, where the wash is brightest: a watermark in the water */
+.water-light--top .water-light__wash::after {
+  content: "";
+  position: absolute;
+  top: clamp(3rem, 9vw, 8rem);
+  right: -10%;
+  width: min(68vw, 1040px);
+  aspect-ratio: 910 / 314;
+  background-color: color-mix(in srgb, var(--color-primary) 13%, transparent);
+  -webkit-mask: url("/images/mechaavo-logo-mark.png") center / contain no-repeat;
+  mask: url("/images/mechaavo-logo-mark.png") center / contain no-repeat;
+}
+
+/* the light of the hero's surface, drifting on with the current (one layer: the area is large) */
+.water-light--top .water-light__caustics {
+  --tile: 640px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 2.4s ease-out;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, var(--color-white) 16%, var(--color-white) 30%, transparent 68%);
+  mask-image: linear-gradient(to bottom, transparent 0%, var(--color-white) 16%, var(--color-white) 30%, transparent 68%);
+}
+.water-light--top .water-light__caustics::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--tile) * -1);
+  left: 0;
+  width: calc(100% + var(--tile));
+  height: calc(100% + var(--tile));
+  background-image: var(--caustic-tile, none);
+  background-size: var(--tile) var(--tile);
+  opacity: 0.34;
+  will-change: transform;
+  animation: caustic-drift 54s linear infinite;
+}
+:root[data-caustic] .water-light--top .water-light__caustics {
+  opacity: 1;
+}
+
+/* — soft: the gray band — */
+.water-light--soft {
+  inset-block: 0;
+}
+.water-light--soft .water-light__wash {
+  background:
+    radial-gradient(
+      ellipse 60% 70% at 100% 0%,
+      color-mix(in srgb, var(--color-primary) 11%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-white) 70%, transparent),
+      transparent 40%
+    );
+}
+.water-light--soft .water-light__caustics {
+  background-image: var(--caustic-tile, none);
+  background-size: 520px 520px;
+  opacity: 0.2;
+  -webkit-mask-image: linear-gradient(to bottom, var(--color-white), transparent 85%);
+  mask-image: linear-gradient(to bottom, var(--color-white), transparent 85%);
+}
+
+/* — bottom: the water gathers at the foot of the page — */
+.water-light--bottom {
+  bottom: 0;
+  height: min(100%, 900px);
+}
+.water-light--bottom .water-light__wash {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 20% 100%,
+      color-mix(in srgb, var(--color-accent-secondary) 20%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--color-primary) 22%, var(--page)) 0%,
+      color-mix(in srgb, var(--color-primary) 8%, var(--page)) 48%,
+      transparent 100%
+    );
+}
+.water-light--bottom .water-light__caustics {
+  background-image: var(--caustic-tile, none);
+  background-size: 560px 560px;
+  opacity: 0.4;
+  -webkit-mask-image: linear-gradient(to top, var(--color-white) 0%, transparent 70%);
+  mask-image: linear-gradient(to top, var(--color-white) 0%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .water-light--top .water-light__caustics::before {
+    animation: none;
+  }
+}
+
+/*
+ * The three principles. Each row has a mark of what it stands for, and the water
+ * light slides across the row it is under (a hover cue on a screen with a pointer;
+ * the rows themselves are not links).
+ */
+.principle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  isolation: isolate;
+}
+.principle::before {
+  content: "";
+  position: absolute;
+  inset: 0 -1.5rem;
+  z-index: -1;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-primary) 13%, transparent),
+    transparent 62%
+  );
+  opacity: 0;
+  transform: translateX(-2%);
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+}
+.principle__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  transition:
+    background-color 300ms var(--ease-out),
+    color 300ms var(--ease-out),
+    border-color 300ms var(--ease-out);
+}
+/* the rows are not controls, so the cue is for a pointer only: a tap would leave it stuck */
+@media (hover: hover) {
+  .principle:hover::before {
+    opacity: 1;
+    transform: none;
+  }
+  .principle:hover .principle__mark {
+    color: var(--on-accent);
+    background-color: var(--accent);
+    border-color: var(--accent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .principle::before,
+  .principle__mark {
+    transition: none;
+  }
+}
