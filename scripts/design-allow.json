@@ -1,0 +1,20 @@
+{
+  "_readme": "Deliberate exceptions to scripts/design-check.mjs. Every entry needs a rule, a file and a real reason; an entry that stops matching is reported so the list cannot rot. Brief-locked deviations are listed by id in docs/DESIGN-GUIDELINES.md section 14.",
+  "entries": [
+    {
+      "rule": "raw-color",
+      "file": "lib/theme/brand.ts",
+      "reason": "The one rgba() string builder canvas code uses; its channels are read from the eight tokens at runtime (CLAUDE.md, Theme)."
+    },
+    {
+      "rule": "hand-svg",
+      "file": "components/hero/LureArt.tsx",
+      "reason": "D5/D9: the procedural lure artwork (brief: no photography). It is art, not an icon, and every layer is aria-hidden."
+    },
+    {
+      "rule": "hand-svg",
+      "file": "components/showcase/ProductCategories.tsx",
+      "reason": "D9: the one decorative swell edge where the categories sheet meets the hero water (brief-supplied)."
+    }
+  ]
+}
