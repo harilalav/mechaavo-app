@@ -1049,7 +1049,7 @@
  */
 @media (scripting: none) and (max-width: 767px), (scripting: none) and (max-aspect-ratio: 1/1) {
   .hero-copy-slot {
-    padding-top: 9.5rem;
+    padding-top: 10.5rem;
   }
 }
 @media (scripting: none) and (min-width: 40rem) {

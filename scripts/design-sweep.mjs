@@ -432,7 +432,7 @@ const probe = (cfg) => {
         const cs = getComputedStyle(container);
         const cl = container.getBoundingClientRect().left + parseFloat(cs.paddingLeft);
         for (const child of container.children) {
-          if (parseFloat(getComputedStyle(child).marginLeft) > 0.5 || !isVisible(child)) continue;
+          if (parseFloat(getComputedStyle(child).marginLeft) > 0.5 || !isVisible(child) || container.closest(".site-nav")) continue; // the sticky bar spaces its logo and Menu apart
           check(child, sel(child), cl);
         }
       }
@@ -770,7 +770,7 @@ async function tabWalk(page) {
   const stops = [];
   for (let i = 0; i < 70; i++) {
     await page.keyboard.press("Tab");
-    await wait(page, 70);
+    await wait(page, 350); // the skip link slides in over 200 ms
     // focusing a category tile while the card is closed opens it (the page scrolls into the hold): let the catalog finish fading in before measuring
     if (await page.evaluate(() => document.activeElement?.classList.contains("cat-card"))) {
       await page
