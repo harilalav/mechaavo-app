@@ -1,0 +1,23 @@
+/*
+ * MECHAAVO — COLOR SOURCE OF TRUTH
+ *
+ * These eight tokens are the ONLY approved colors for the website.
+ * This is the only file in the project allowed to contain raw color values.
+ *
+ * - Do not add colors, shades, or tints here.
+ * - Do not hardcode hex/rgb/hsl/named colors anywhere else.
+ * - Need transparency? Use opacity, Tailwind's `/NN` modifier, or
+ *   `color-mix(in srgb, var(--color-x) NN%, transparent)`.
+ * - Canvas code reads these via lib/theme/brand.ts.
+ */
+:root {
+  --color-primary: #00b2ff;
+  --color-secondary: #2b3438;
+  --color-dark: #0c0f10;
+  --color-surface: #1d2021;
+  --color-light: #efefef;
+  --color-white: #ffffff;
+
+  --color-accent-primary: #00b2ff;
+  --color-accent-secondary: #31ccef;
+}

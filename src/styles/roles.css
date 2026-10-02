@@ -1,0 +1,32 @@
+/*
+ * Theme roles.
+ *
+ * Roles say what a color is FOR (page ground, ink, line, accent). Each one
+ * points at a token from theme.css, so no raw color lives here and the palette
+ * is still the eight approved tokens. Components use roles (bg-page, text-ink,
+ * border-line, ...) instead of naming dark or white, which keeps the theme a
+ * one-file decision.
+ *
+ * Current theme: white (set by the client). To re-theme, point the roles at
+ * different tokens below; nothing else needs to change.
+ *
+ * Need transparency? Use `color-mix(in srgb, <token> N%, transparent)` or the
+ * Tailwind /NN modifier, exactly as for tokens.
+ */
+:root {
+  /* grounds */
+  --page: var(--color-white);
+  --page-alt: var(--color-light);
+
+  /* text */
+  --ink: var(--color-dark);
+  --ink-soft: var(--color-secondary);
+  --ink-muted: color-mix(in srgb, var(--color-secondary) 72%, transparent);
+
+  /* hairlines and dividers */
+  --line: color-mix(in srgb, var(--color-secondary) 16%, transparent);
+
+  /* the one accent: actions, focus, highlights */
+  --accent: var(--color-primary);
+  --on-accent: var(--color-dark);
+}

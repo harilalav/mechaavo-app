@@ -1,26 +1,167 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@import "../src/styles/theme.css";
+@import "../src/styles/roles.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Scan only the app's own code for utility classes. Automatic detection would
+ * also read the design-skill notes in .agents/ (which show example classes with
+ * raw rgba() shadows) and compile them into the stylesheet, which would put
+ * colors in the CSS that are not Mechaavo tokens.
+ */
+@source "../app";
+@source "../components";
+@source "../lib";
 
+/*
+ * Tailwind <-> Mechaavo tokens.
+ *
+ * `--color-*: initial` removes Tailwind's entire default palette, so no stock
+ * color utilities exist. The only colors a component can reach are the ones
+ * below, and every one resolves to a token in src/styles/theme.css (the single
+ * source of truth):
+ *
+ *   roles  (what a color is for; see src/styles/roles.css)
+ *     bg-page | bg-page-alt | text-ink | text-ink-soft | text-ink-muted
+ *     border-line | bg-accent | text-on-accent
+ *   tokens (the raw approved palette)
+ *     bg-brand-primary | bg-brand-secondary | bg-brand-dark | bg-brand-surface
+ *     text-brand-light | text-brand-white | text-brand-accent ...
+ *
+ * Prefer roles. Opacity modifiers work as usual (bg-page/60) and compile to
+ * color-mix() on the token, so no extra color values are ever introduced.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-*: initial;
+  /* Tailwind's stock shadows are raw black: shadows are tinted with tokens instead (see underwater.css) */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  --color-brand-primary: var(--color-primary);
+  --color-brand-secondary: var(--color-secondary);
+  --color-brand-dark: var(--color-dark);
+  --color-brand-surface: var(--color-surface);
+  --color-brand-light: var(--color-light);
+  --color-brand-white: var(--color-white);
+  --color-brand-accent-primary: var(--color-accent-primary);
+  --color-brand-accent: var(--color-accent-secondary);
+
+  --color-page: var(--page);
+  --color-page-alt: var(--page-alt);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+
+  /* the typeface itself is chosen in lib/config/fonts.ts */
+  --font-sans: var(--font-raleway), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* page layout: one column width and gutter for every section */
+    --page-max: 1600px;
+    --page-pad: clamp(1.25rem, 6vw, 6.5rem);
+    /* the one easing curve for UI motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    /*
+     * Page-level layers, back to front: the sheet that curtains over the hero, the
+     * dialogs, the veil a jump to a section dips through, the sticky nav bar (above the
+     * veil, so it stays put while the content dips), the skip link. The hero (--z-* in underwater.css), the catalog (--cat-z-*)
+     * and the story media keep scales of their own inside their stacking contexts.
+     * A z-index is always one of these names, never a number (design:lint z-literal).
+     */
+    --z-sheet: 1;
+    --z-modal: 100;
+    --z-veil: 500;
+    --z-bar: 600;
+    --z-skip: 1000;
+  }
+
+  html {
+    color-scheme: light;
+    background-color: var(--page);
+  }
+
+  body {
+    background-color: var(--page);
+    color: var(--ink-soft);
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+    /* Raleway's default digits are old-style; keep numerals on the cap height */
+    font-variant-numeric: lining-nums;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--ink);
+  }
+
+  /* ink, not the accent: the accent blue is below 3:1 on a white page */
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /*
+   * The first Tab stop: it jumps over the nav to the hero copy (the nav sits inside
+   * <main>, so the next Tab after it lands on the call to action). Off screen until
+   * it has keyboard focus.
+   */
+  .skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: var(--page-pad);
+    z-index: var(--z-skip);
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 1.1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--page);
+    background-color: var(--ink);
+    transform: translateY(-200%);
+  }
+  .skip-link:focus-visible {
+    transform: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .skip-link {
+      transition: transform 200ms var(--ease-out);
+    }
+  }
+
+  /* Content column shared by the hero stage and every section below it. */
+  .page-container {
+    width: min(100%, var(--page-max));
+    margin-inline: auto;
+    padding-inline: var(--page-pad);
+  }
+
+  /*
+   * Display type: the single headline voice. Used by the hero headline, the
+   * brand statement and the story headline so they read as one system.
+   */
+  .display-type {
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    /* at 200% text a long word (ENGINEERED) would be wider than a phone: it breaks instead of being cut off by its section */
+    overflow-wrap: anywhere;
+    color: var(--ink);
+  }
 }
