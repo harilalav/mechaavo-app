@@ -1,0 +1,138 @@
+/*
+ * Button plate: the "cast" plate (tide.css) on every button.
+ *
+ * Hover, keyboard focus or a press wipes the heading's skewed blue plate in behind
+ * the label, a band of light crosses it once, and the label turns ink (white on the
+ * blue plate is 2.4:1; ink on it is 8:1 and better). Same colours, same skew, same
+ * curve as the heading, and the same glint keyframe, so a button and "cast" read as
+ * one hand. Tokens only: no colour of its own lives here.
+ *
+ * How, with no markup: the button gets `tide-btn`; its ::before is the plate and its
+ * ::after the glint, clipped to the button's own shape by overflow (rounded buttons
+ * too; its own outline and shadow are not clipped). Transform and opacity only, plus
+ * the label's colour. Nothing changes size.
+ *
+ *   enter   plate wipes in 420 ms, glint follows once the plate has landed
+ *   leave   plate retracts the way it came, 260 ms (a leave is quicker than an enter)
+ *   press   the button's own :active push stays; on touch the plate shows on :active
+ *           only, because :hover would stay stuck after a tap (hover is gated below)
+ *   reduced motion  no wipe: the plate fades in, no glint
+ *   forced colours  no plate; a Highlight outline says the same thing
+ *   no script       works the same, it is all CSS
+ *
+ * Position: the button must be positioned (a few are absolute already; the static
+ * ones set `position: relative` in their own rules, since a rule here would beat
+ * the Tailwind `absolute` on the close button).
+ *
+ * A button with its own `transition` list must keep `color var(--btn-color)` in it,
+ * or the label flips before the plate has covered it (white icon on a dark button
+ * would vanish for a moment).
+ */
+
+:root {
+  --btn-in: 420ms;
+  --btn-out: 260ms;
+  --btn-ease: cubic-bezier(0.7, 0, 0.2, 1);
+  /* the label turns ink once the plate is under it */
+  --btn-color: 200ms var(--ease-out) 120ms;
+}
+
+.tide-btn {
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    color var(--btn-color),
+    transform 300ms var(--ease-out),
+    box-shadow 300ms var(--ease-out);
+}
+
+/* the plate: wider than the button so the skewed ends never leave a gap */
+.tide-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0 -0.5rem;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(100deg, var(--color-primary) 0%, var(--color-accent-secondary) 100%);
+  transform: scaleX(0) skewX(var(--tide-skew));
+  transform-origin: 0 50%;
+  transition: transform var(--btn-out) var(--btn-ease);
+}
+/* the band of light that crosses it */
+.tide-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -0.5rem;
+  z-index: -1;
+  width: 36%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    color-mix(in srgb, var(--color-white) 62%, transparent),
+    transparent
+  );
+  transform: translateX(-140%);
+}
+
+/* keyboard focus, a press, and (on a menu button) the open state: always. A pointer passing over: only where hover exists. */
+.tide-btn:is(:focus-visible, :active, [aria-expanded="true"]) {
+  color: var(--on-plate, var(--ink));
+}
+.tide-btn:is(:focus-visible, :active, [aria-expanded="true"])::before {
+  transform: scaleX(1) skewX(var(--tide-skew));
+  transition-duration: var(--btn-in);
+}
+.tide-btn:is(:focus-visible, :active, [aria-expanded="true"])::after {
+  animation: tide-glint-again 1100ms ease-in-out 260ms both;
+}
+@media (hover: hover) {
+  .tide-btn:hover {
+    color: var(--on-plate, var(--ink));
+  }
+  .tide-btn:hover::before {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    transition-duration: var(--btn-in);
+  }
+  .tide-btn:hover::after {
+    animation: tide-glint-again 1100ms ease-in-out 260ms both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* no wipe, no light: the plate just fades in, so the state still reads */
+  .tide-btn::before {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  .tide-btn::after {
+    display: none;
+  }
+  .tide-btn:is(:focus-visible, :active, [aria-expanded="true"])::before {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .tide-btn:hover::before {
+    opacity: 1;
+  }
+}
+
+/* Windows high contrast: system colours, no gradients; the outline carries the state */
+@media (forced-colors: active) {
+  .tide-btn::before,
+  .tide-btn::after {
+    display: none;
+  }
+  .tide-btn:is(:focus-visible, :active, [aria-expanded="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+@media (forced-colors: active) and (hover: hover) {
+  .tide-btn:hover {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

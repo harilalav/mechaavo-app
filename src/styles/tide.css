@@ -1,0 +1,326 @@
+/*
+ * Tide type: the heading system (components/ui/Tide.tsx).
+ *
+ * Colour rule, as everywhere: tokens only. The letters stay dark, because on a
+ * white page the brand blues are 2.4:1 and 1.9:1 and cannot carry text: they are
+ * ink dipped in the water, a gradient from --color-dark toward --color-primary
+ * whose blue stop lies past the end of the letter, so the baseline only gets
+ * about half way (5.7:1 there, 16:1 at the top). Colour comes in around them too:
+ *   - the plate behind the payoff word, a gradient from --color-primary to
+ *     --color-accent-secondary, with ink text on it (8 to 10:1)
+ *   - the drop that replaces the full stop, and the ripples it sends out
+ *   - a glint of light that crosses the plate once it has landed
+ *
+ * Motion is transform and opacity only, and every state has a fallback:
+ *   no script, reduced motion, or the observer never starting  ->  the finished
+ *   heading, plate and drop in place, nothing hidden.
+ * With script and motion allowed, a heading is held back until
+ * components/ui/TideObserver.tsx marks it data-inview as it scrolls into view;
+ * if hydration fails, a failsafe shows every heading after 3 s.
+ */
+
+/* the water level inside the letters: 0 is plain ink, 1 is the finished fade (animated once, after the words land) */
+@property --tide-dip {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* how far the plate leans; on :root because the button plates (tide-button.css) and the tile names lean the same way outside a heading */
+:root {
+  --tide-skew: -9deg;
+}
+
+/* an explicit line, like the hero's */
+.tide__line {
+  display: block;
+}
+/* a quieter second line: --color-secondary at 84%, 6:1 and better even on the blue wash behind the story heading (the site's --ink-muted is 72% and dips to 4.3 there) */
+.tide__line--muted {
+  margin-top: 0.14em;
+  color: color-mix(in srgb, var(--color-secondary) 84%, transparent);
+}
+
+/*
+ * Each word sits in a mask it can rise out of. A clip-path, not overflow:hidden:
+ * an overflow-hidden inline-block puts its baseline on its bottom edge, which would
+ * drop the words below the line and the drop below them.
+ */
+.tide__w {
+  display: inline-block;
+  clip-path: inset(-0.2em -0.3em -0.18em -0.3em);
+}
+.tide__i {
+  display: inline-block;
+  transform-origin: 0 100%;
+}
+
+/*
+ * Letter fill: ink dipped in the water. The blue stop sits past the end of the
+ * letter (170% of the word's box; the glyphs end near 83% of it), so the baseline
+ * is only about 40% of the way there and stays above 5:1. `tide--flat` opts out.
+ * The clip is on each word, so every word gets the same vertical fade.
+ */
+.tide__i {
+  background: linear-gradient(
+    180deg,
+    var(--color-dark) 22%,
+    var(--color-primary) calc(150% + (1 - var(--tide-dip)) * 500%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.tide--flat .tide__i,
+.tide__line--muted .tide__i {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+/* — the plate — */
+
+.tide__mark {
+  position: relative;
+  display: inline-block;
+  isolation: isolate;
+  padding-inline: 0.16em;
+  margin-inline: -0.04em;
+  white-space: nowrap;
+  /* ink on the plate, whatever the line around it is set in (and no browser-default yellow behind it) */
+  color: var(--ink);
+  -webkit-text-fill-color: currentColor;
+  background: none;
+}
+/* a plate that opens a line hangs into the margin by its own padding, so the text stays on the column's edge */
+.tide__mark--lead {
+  margin-left: -0.16em;
+}
+.tide__mark .tide__i {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+.tide__plate {
+  position: absolute;
+  inset: 0.07em 0 0.01em;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(100deg, var(--color-primary) 0%, var(--color-accent-secondary) 100%);
+  transform: skewX(var(--tide-skew));
+  transform-origin: 0 50%;
+}
+/* a band of light that crosses the plate once it has landed (and again on hover) */
+.tide__glint {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 36%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    color-mix(in srgb, var(--color-white) 62%, transparent),
+    transparent
+  );
+  transform: translateX(-140%);
+}
+
+/* — the drop (the full stop) — */
+
+.tide__drop {
+  position: relative;
+  display: inline-block;
+  width: 0.2em;
+  height: 0.2em;
+  margin-left: 0.07em;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  transform-origin: 50% 100%;
+}
+/* ripples are flat ellipses: the surface seen at an angle, and they stay inside a line's mask */
+.tide__ring {
+  position: absolute;
+  inset: -0.07em;
+  border: 0.035em solid var(--color-accent-secondary);
+  border-radius: 50%;
+  opacity: 0;
+  transform-origin: 50% 75%;
+}
+
+/* ————————————————— motion ————————————————— */
+
+@keyframes tide-rise {
+  from {
+    transform: translateY(120%) rotate(5deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes tide-dip {
+  from {
+    --tide-dip: 0;
+  }
+  to {
+    --tide-dip: 1;
+  }
+}
+@keyframes tide-plate {
+  from {
+    transform: scaleX(0) skewX(var(--tide-skew));
+  }
+  to {
+    transform: scaleX(1) skewX(var(--tide-skew));
+  }
+}
+@keyframes tide-glint {
+  from {
+    transform: translateX(-140%);
+  }
+  to {
+    transform: translateX(380%);
+  }
+}
+/* falls, flattens on the surface, springs back, settles */
+@keyframes tide-drop {
+  0% {
+    transform: translateY(var(--tide-fall, -1.7em)) scale(0.6, 1.5);
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  40% {
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(0) scale(1.4, 0.58);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.3, 1);
+  }
+  80% {
+    transform: translateY(-0.09em) scale(0.9, 1.14);
+    animation-timing-function: ease-in-out;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes tide-ring {
+  from {
+    transform: scale(0.5, 0.3);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(4.4, 1.3);
+    opacity: 0;
+  }
+}
+/* the hover versions have their own names so they can run again after the first */
+@keyframes tide-glint-again {
+  from {
+    transform: translateX(-140%);
+  }
+  to {
+    transform: translateX(380%);
+  }
+}
+@keyframes tide-ring-again {
+  from {
+    transform: scale(0.5, 0.3);
+    opacity: 0.95;
+  }
+  to {
+    transform: scale(4.4, 1.3);
+    opacity: 0;
+  }
+}
+@keyframes tide-failsafe {
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  /* held back until the heading is in view */
+  .tide:not([data-inview]) .tide__i {
+    transform: translateY(120%) rotate(5deg);
+  }
+  .tide:not([data-inview]) .tide__plate {
+    transform: scaleX(0) skewX(var(--tide-skew));
+  }
+  .tide:not([data-inview]) .tide__drop {
+    opacity: 0;
+  }
+
+  .tide[data-inview] .tide__i {
+    animation:
+      tide-rise 1000ms var(--ease-out) both,
+      tide-dip 1800ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 55ms), calc(var(--i, 0) * 55ms + 650ms);
+  }
+  .tide[data-inview] .tide__plate {
+    animation: tide-plate 820ms cubic-bezier(0.7, 0, 0.2, 1) both;
+    animation-delay: var(--pd, 380ms);
+  }
+  .tide[data-inview] .tide__glint {
+    animation: tide-glint 1300ms ease-in-out both;
+    animation-delay: calc(var(--pd, 380ms) + 760ms);
+  }
+  .tide[data-inview] .tide__drop {
+    animation: tide-drop 900ms both;
+    animation-delay: var(--dd, 900ms);
+  }
+  .tide[data-inview] .tide__ring {
+    animation: tide-ring 1150ms ease-out both;
+    animation-delay: calc(var(--dd, 900ms) + 560ms);
+  }
+  .tide[data-inview] .tide__ring--2 {
+    animation-delay: calc(var(--dd, 900ms) + 760ms);
+  }
+
+  /* if the observer never starts (hydration failed), show everything after 3 s rather than never */
+  html:not([data-tide-ready]) .tide:not([data-inview]) .tide__i,
+  html:not([data-tide-ready]) .tide:not([data-inview]) .tide__plate,
+  html:not([data-tide-ready]) .tide:not([data-inview]) .tide__drop {
+    animation: tide-failsafe 1ms 3s both;
+  }
+}
+
+/* a pointer passing over a landed heading: the light crosses again, the drop ripples again */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .tide[data-inview]:hover .tide__glint {
+    animation: tide-glint-again 1100ms ease-in-out both;
+  }
+  .tide[data-inview]:hover .tide__ring {
+    animation: tide-ring-again 1150ms ease-out both;
+  }
+  .tide[data-inview]:hover .tide__ring--2 {
+    animation-delay: 200ms;
+  }
+}
+
+/*
+ * Windows high contrast: the system colours and no gradients. The plate cannot
+ * keep its colour there (the highlight colour with its own text colour left the
+ * word unreadable in testing), so the payoff word is underlined instead.
+ */
+@media (forced-colors: active) {
+  .tide__i {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+  .tide__plate,
+  .tide__glint,
+  .tide__ring {
+    display: none;
+  }
+  .tide__mark {
+    color: CanvasText;
+  }
+  /* each word is its own inline-block, which a parent's text-decoration does not reach */
+  .tide__mark .tide__i {
+    text-decoration: underline;
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.14em;
+  }
+  .tide__drop {
+    background-color: CanvasText;
+  }
+}

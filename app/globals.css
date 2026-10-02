@@ -2,6 +2,8 @@
 @import "../src/styles/theme.css";
 @import "../src/styles/roles.css";
 @import "../src/styles/brand.css";
+@import "../src/styles/tide.css";
+@import "../src/styles/tide-button.css";
 
 /*
  * Scan only the app's own code for utility classes. Automatic detection would
