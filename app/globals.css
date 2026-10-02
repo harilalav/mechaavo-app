@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @import "../src/styles/theme.css";
 @import "../src/styles/roles.css";
+@import "../src/styles/brand.css";
 
 /*
  * Scan only the app's own code for utility classes. Automatic detection would
