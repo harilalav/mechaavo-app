@@ -1,0 +1,711 @@
+/*
+ * Product categories: a portrait card of water that opens to fill the screen
+ * (components/showcase/ProductCategories.tsx; the opening is scrubbed by
+ * lib/animations/categoriesTimeline.ts).
+ *
+ * Same rule as everywhere: every colour is a token or a role, and shadows are
+ * tinted with tokens, never black.
+ *
+ * One set of elements, two layouts:
+ *   static     the default. An ordinary block: the water is the background, the
+ *              catalog sits in the flow and the white preview card is not shown.
+ *              This is what you get with no script, with reduced motion, or if the
+ *              animation scripts fail to load (the section then carries data-static).
+ *   scrolling  script on and motion allowed (the same gate as the hero's .hero-track).
+ *              The section is a tall track and the stage sticks inside it, so the
+ *              browser does the pinning: no JS pin, no spacer. The card starts as a
+ *              portrait card with the white preview on it, and scroll opens it.
+ *
+ * The opening is ONE number, --open (0 = the card, 1 = the full screen), the only
+ * thing GSAP drives. Nothing in the layout changes while it opens: the frame is the
+ * whole stage the entire time and the card is a window cut in it (clip-path, with
+ * the radius), the water behind the window scales up with it (transform), and the
+ * pause button rides to the corner (translate). A card that grew by width and
+ * height instead counted as layout shift on every frame of the scroll (a CLS of
+ * 0.25 over the page), which the lab never sees because it never scrolls. All the
+ * sizes stay calc()s of clamp / vw / svh: nothing is measured, nothing needs a
+ * refresh when the window resizes.
+ */
+
+@property --open {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.cat-track {
+  /* scroll distance of the whole opening = (screens - 1) viewport heights; the only place it is set */
+  --cat-screens: 3;
+  /*
+   * the closed card: portrait, and never wider than the page column on a phone. The
+   * column is measured as 100cqw (the stage below is a size container), not 100vw:
+   * 100vw includes the scrollbar, which a desktop browser with classic scrollbars
+   * takes out of the layout width.
+   */
+  --card-w: min(clamp(360px, 44vw, 560px), calc(100cqw - 2 * var(--page-pad)));
+  --card-h: min(clamp(480px, 64svh, 660px), calc(100svh - 2rem));
+  --card-r: 36px;
+  /* water left showing around the white preview card */
+  --card-ring: clamp(1.1rem, 3.4vw, 3.25rem);
+}
+
+.cat-stage {
+  position: relative;
+  /* the width the card's calc()s measure against (100cqw), see --card-w */
+  container-type: inline-size;
+}
+
+/*
+ * The card. Paint order inside it, back to front: the water, the catalog (frosted
+ * glass), the white preview, the pause button (above the glass, so it is never blurred).
+ */
+.cat-frame {
+  --cat-z-media: 0;
+  --cat-z-catalog: 1;
+  --cat-z-preview: 2;
+  --cat-z-toggle: 3;
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100svh;
+  background-color: var(--color-primary);
+}
+
+/* the card's shadow exists only in the scrolling layout (below) */
+.cat-shadow {
+  display: none;
+}
+
+/* — the water — */
+
+.cat-media {
+  position: absolute;
+  inset: 0;
+  z-index: var(--cat-z-media);
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--color-primary);
+}
+
+/*
+ * The footage is stored as plain grayscale (docs/media-credits.md), so all of its
+ * colour comes from tokens, in the same three layers as the story panel
+ * (story.css): the clip multiplied onto --color-primary, a lift of white from the
+ * sunlit top (screen), a dark scrim at the bottom for depth (multiply).
+ */
+.cat-media__poster,
+.cat-media__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  filter: brightness(1.25) contrast(1.05);
+  /* mirrored, so it does not read as the same shot as the footage in the story section that follows */
+  transform: scaleX(-1);
+}
+/* the poster stands in until the first frame of the clip is on screen */
+.cat-media__poster {
+  transition: opacity 700ms var(--ease-out);
+}
+.cat-media[data-started] .cat-media__poster {
+  opacity: 0;
+}
+
+.cat-media__lift,
+.cat-media__deep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cat-media__lift {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-white) 55%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+.cat-media__deep {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--color-dark) 38%, transparent),
+    transparent 55%
+  );
+  mix-blend-mode: multiply;
+}
+
+/* pause / play: a 44px target, in the card's corner, above the glass */
+.cat-toggle {
+  position: absolute;
+  z-index: var(--cat-z-toggle);
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  color: var(--color-white);
+  background-color: color-mix(in srgb, var(--color-dark) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-white) 32%, transparent);
+  transition:
+    color var(--btn-color),
+    transform 300ms var(--ease-out);
+}
+/* hover: the cast plate (class tide-btn, tide-button.css), the icon turning ink on it */
+.cat-toggle:active {
+  transform: scale(0.96);
+}
+/* sits on the footage, so the focus ring is white rather than ink */
+.cat-toggle:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 3px;
+}
+/* without script there is nothing to control */
+.cat-media:not([data-ready]) ~ .cat-toggle {
+  display: none;
+}
+
+/* — the catalog: frosted glass over the water — */
+
+.cat-catalog {
+  position: relative;
+  z-index: var(--cat-z-catalog);
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding-block: clamp(3rem, 7vw, 5.5rem) clamp(4.5rem, 8vw, 6rem);
+  background-color: color-mix(in srgb, var(--page) 50%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+/* centred on the screen when it fits; auto margins (unlike justify-content) never cut the top off when it does not */
+.cat-catalog__inner {
+  margin-block: auto;
+}
+/* the explainer under the headline only where there is height to spare: the eight tiles come first */
+.cat-catalog__lede {
+  display: none;
+}
+@media (min-width: 768px) and (min-height: 56rem) {
+  .cat-catalog__lede {
+    display: block;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cat-catalog {
+    background-color: color-mix(in srgb, var(--page) 94%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/*
+ * The eight tiles. The catalog sits in a pinned view, so all eight must stay in one
+ * screen, and the spacing is a handful of custom properties so the same tile can be
+ * roomy on a big screen and tight on a small or short one. Browsers show less height
+ * than the screen has (address bar, toolbars), so "short" starts at 56rem, not at
+ * the height of a laptop panel.
+ *
+ *   phone / tablet (< 1024px)   compact: number, name, action; 2 columns, 4 from 768px
+ *   laptop and up, short        compact, a little roomier
+ *   laptop and up, 46rem tall   full: adds the tag, the strapline and two sub-lines
+ *   laptop and up, 56rem tall   full and roomy
+ * The extras are in the inspector too, so nothing is lost by leaving them out here.
+ */
+.cat-grid {
+  --tile-gap: 0.5rem;
+  --tile-pad: 0.875rem;
+  --tile-stack: 0.5rem;
+  --tile-min: 6.5rem;
+  --tile-name: clamp(1rem, 4.6vw, 1.25rem);
+
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tile-gap);
+}
+/* must come before the rule that brings the extras back */
+.cat-card__more {
+  display: none;
+}
+/* the narrowest phones (320px): a little less padding and type so every label still sits on one line */
+@media (max-width: 340px) {
+  .cat-grid {
+    --tile-pad: 0.625rem;
+    --tile-name: 0.9375rem;
+  }
+}
+@media (min-width: 768px) {
+  .cat-grid {
+    --tile-gap: 0.75rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .cat-grid {
+    --tile-gap: 1rem;
+    --tile-pad: 1rem;
+    --tile-stack: 0.75rem;
+    --tile-min: 0px;
+    --tile-name: 1.375rem;
+  }
+}
+@media (min-width: 1024px) and (min-height: 46rem) {
+  .cat-grid {
+    --tile-stack: 0.875rem;
+    --tile-name: 1.5rem;
+  }
+  .cat-card__more {
+    /* back to whatever the element would be (block, inline, or the flex a utility gives it) */
+    display: revert-layer;
+  }
+  .cat-card__foot {
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
+  }
+  .cat-card__foot > div + div {
+    margin-top: 0.75rem;
+  }
+}
+@media (min-width: 1024px) and (min-height: 56rem) {
+  .cat-grid {
+    --tile-pad: 1.25rem;
+    --tile-stack: 1.25rem;
+  }
+}
+.cat-card__name {
+  width: fit-content;
+  padding-bottom: 0.08em;
+  font-size: var(--tile-name);
+}
+/*
+ * The cast plate on the name's last word (Tide's Mark, the same plate as the
+ * headings and the buttons), closed until the tile is touched: hover on a pointer,
+ * keyboard focus or a press anywhere. Wipe in, the light crosses once, wipe back
+ * out quicker (tide-button.css has the timings and the reasons).
+ */
+.cat-card__name .tide__plate {
+  transform: scaleX(0) skewX(var(--tide-skew));
+  transition: transform var(--btn-out) var(--btn-ease);
+}
+.cat-card:is(:focus-visible, :active) .cat-card__name .tide__plate {
+  transform: scaleX(1) skewX(var(--tide-skew));
+  transition-duration: var(--btn-in);
+}
+.cat-card:is(:focus-visible, :active) .cat-card__name .tide__glint {
+  animation: tide-glint-again 1100ms ease-in-out 260ms both;
+}
+@media (hover: hover) {
+  .cat-card:hover .cat-card__name .tide__plate {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    transition-duration: var(--btn-in);
+  }
+  .cat-card:hover .cat-card__name .tide__glint {
+    animation: tide-glint-again 1100ms ease-in-out 260ms both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* no wipe, no light: the plate fades in */
+  .cat-card__name .tide__plate {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  .cat-card:is(:focus-visible, :active) .cat-card__name .tide__plate {
+    opacity: 1;
+  }
+  .cat-card__name .tide__glint {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .cat-card:hover .cat-card__name .tide__plate {
+    opacity: 1;
+  }
+}
+/* high contrast has no plate (tide.css hides it): the word is underlined instead */
+@media (forced-colors: active) {
+  .cat-card:is(:focus-visible, :active) .cat-card__name .tide__mark {
+    text-decoration: underline;
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.14em;
+  }
+}
+@media (forced-colors: active) and (hover: hover) {
+  .cat-card:hover .cat-card__name .tide__mark {
+    text-decoration: underline;
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.14em;
+  }
+}
+
+/* a category tile: a little more solid than the glass, tinted lift on hover */
+.cat-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--tile-stack);
+  min-height: var(--tile-min);
+  padding: var(--tile-pad);
+  cursor: pointer;
+  touch-action: manipulation;
+  background-color: color-mix(in srgb, var(--page) 78%, transparent);
+  transition:
+    transform 300ms var(--ease-out),
+    box-shadow 300ms var(--ease-out),
+    background-color 300ms var(--ease-out),
+    border-color 300ms var(--ease-out);
+}
+.cat-card:focus-visible {
+  transform: translateY(-4px);
+  background-color: var(--page);
+  border-color: var(--accent);
+  box-shadow: 0 18px 32px -16px color-mix(in srgb, var(--color-primary) 55%, transparent);
+}
+/* the same lift for a pointer; on touch :hover would stay stuck after a tap */
+@media (hover: hover) {
+  .cat-card:hover {
+    transform: translateY(-4px);
+    background-color: var(--page);
+    border-color: var(--accent);
+    box-shadow: 0 18px 32px -16px color-mix(in srgb, var(--color-primary) 55%, transparent);
+  }
+}
+/* a physical push when pressed */
+.cat-card:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-card {
+    transition: none;
+  }
+  .cat-card:focus-visible,
+  .cat-card:active {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .cat-card:hover {
+    transform: none;
+  }
+}
+
+/* — the white preview card (shown only while scrolling) — */
+
+.cat-preview {
+  display: none;
+}
+
+.cat-preview__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: var(--page-alt);
+  /* 12px is the floor for any text; the tracking is what gives way when the card is narrow */
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: clamp(0.03em, 0.8cqw, 0.12em);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+/* a foldable's cover screen: the badge may take two lines rather than leave the card */
+@media (max-width: 340px) {
+  .cat-preview__badge {
+    white-space: normal;
+  }
+}
+.cat-preview__dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--accent);
+  animation: cat-pulse 2s ease-out infinite;
+}
+@keyframes cat-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 0.55rem transparent;
+  }
+}
+
+/* sized from the card's own width, so the longest line (CATEGORIES.) never outgrows it */
+.cat-preview__title {
+  font-size: clamp(1.25rem, 12.4cqw, 3.5rem);
+}
+.cat-preview__sub {
+  max-width: 22rem;
+  margin-top: clamp(0.6rem, 3cqw, 1rem);
+  font-size: clamp(0.875rem, 4.1cqw, 1rem);
+  line-height: 1.5;
+  text-wrap: balance;
+  color: var(--ink-soft);
+}
+.cat-preview__foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: clamp(0.75rem, 3.5cqw, 0.85rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+.cat-preview__foot svg {
+  color: var(--accent);
+}
+
+/* ————————————————— scrolling layout ————————————————— */
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .cat-track:not([data-static]) {
+    height: calc(100svh * var(--cat-screens));
+  }
+
+  .cat-track:not([data-static]) .cat-stage {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  /*
+   * The frame is the whole stage; the card is a window cut in it. The insets are a
+   * share of the frame (percentages in inset() are of its own width and height), so
+   * it goes from the closed card (--open 0, with the card's radius) to everything
+   * (--open 1, square). clip-path is paint, not layout: no layout shift.
+   */
+  .cat-track:not([data-static]) .cat-frame {
+    --open: 0;
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    clip-path: inset(
+      calc((100% - var(--card-h)) / 2 * (1 - var(--open)))
+      calc((100% - var(--card-w)) / 2 * (1 - var(--open)))
+      round calc(var(--card-r) * (1 - var(--open)))
+    );
+  }
+
+  /* a clip-path would cut the card's shadow off, so the shadow is its own card-sized layer behind it, gone once the window is open a little */
+  .cat-track:not([data-static]) .cat-shadow {
+    --open: 0;
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: var(--card-w);
+    height: var(--card-h);
+    margin: auto;
+    border-radius: var(--card-r);
+    pointer-events: none;
+    opacity: max(0, calc(1 - var(--open) * 5));
+    box-shadow:
+      0 46px 90px -34px color-mix(in srgb, var(--color-secondary) 46%, transparent),
+      0 22px 44px -22px color-mix(in srgb, var(--color-primary) 42%, transparent);
+  }
+
+  /*
+   * The water grows with the window: it is always laid out for the full screen and
+   * scaled from the size that just covers the closed card (--s0, the card's share of
+   * the stage on its tighter axis; tan(atan2()) is how CSS divides one length by
+   * another) up to 1. If a browser lacks those functions the scale is ignored and the
+   * water simply stays at full size behind the window.
+   */
+  .cat-track:not([data-static]) .cat-media {
+    --open: 0;
+    --s0: max(tan(atan2(var(--card-w), 100cqw)), tan(atan2(var(--card-h), 100svh)));
+    transform: scale(calc(var(--s0) + (1 - var(--s0)) * var(--open)));
+  }
+
+  /* the catalog and the pause button are laid out for the full screen too; the button starts at the card's corner */
+  .cat-track:not([data-static]) .cat-toggle {
+    --open: 0;
+    translate: calc((var(--card-w) - 100cqw) / 2 * (1 - var(--open)))
+      calc((var(--card-h) - 100svh) / 2 * (1 - var(--open)));
+  }
+
+  /*
+   * The catalog fills the stage and is unseen until the timeline brings it in
+   * (opacity on the glass itself, so the blur fades in with it). It is hidden by
+   * opacity and stays in the page, never by visibility: a keyboard or a screen
+   * reader has to reach the eight tiles at any scroll position (focusing a tile
+   * opens the card, see categoriesTimeline.ts). It takes no pointer until the card
+   * is open (the timeline sets data-open), so the closed card's water is not a
+   * hidden button.
+   */
+  .cat-track:not([data-static]) .cat-catalog {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    padding-block: clamp(1.25rem, 3vw, 2.5rem) 4rem;
+    overflow-y: auto;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cat-track:not([data-static])[data-open] .cat-catalog {
+    pointer-events: auto;
+  }
+
+  .cat-track:not([data-static]) .cat-preview {
+    position: absolute;
+    inset: 0;
+    z-index: var(--cat-z-preview);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    width: calc(var(--card-w) - 2 * var(--card-ring));
+    height: calc(var(--card-h) * 0.7);
+    margin: auto;
+    padding: clamp(1.1rem, 2.4vw, 1.9rem);
+    text-align: center;
+    background-color: var(--page);
+    border-radius: 28px;
+    box-shadow:
+      0 30px 56px -20px color-mix(in srgb, var(--color-dark) 40%, transparent),
+      0 12px 24px -14px color-mix(in srgb, var(--color-primary) 45%, transparent);
+    /* the type inside is sized from this card's width (cqw) */
+    container-type: inline-size;
+  }
+}
+
+/* from a laptop width the grid ends clear of the pause button's corner, so the catalog can sit centred */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
+  .cat-track:not([data-static]) .cat-catalog {
+    padding-block-end: clamp(1.25rem, 3vw, 2.5rem);
+  }
+}
+
+/*
+ * The catalog's heading size lives here, not in utility classes: this rule is
+ * unlayered, so it would beat them anyway. A phone keeps it on one line; from md it
+ * is the display size.
+ */
+.cat-catalog__title {
+  font-size: clamp(1.5rem, 1.1rem + 2.4vw, 1.875rem);
+  line-height: 1.2;
+}
+@media (min-width: 768px) {
+  .cat-catalog__title {
+    font-size: 3rem;
+    line-height: 1;
+  }
+}
+
+/*
+ * A short screen (a phone on its side): the card is mostly the headline, with a
+ * taller ring of water so the pause button clears it, and the catalog gives up its
+ * intro line and a size of heading to keep the tiles in view. From 640 px wide the
+ * eight tiles sit in two rows of four, so they fit without scrolling inside the card.
+ * (After the md rule above: the short-screen size wins.)
+ */
+@media (max-height: 34rem) {
+  .cat-track:not([data-static]) .cat-preview {
+    height: calc(var(--card-h) * 0.62);
+  }
+  .cat-preview__sub {
+    display: none;
+  }
+  .cat-catalog__title {
+    font-size: 1.75rem;
+  }
+}
+@media (max-height: 34rem) and (min-width: 40rem) {
+  .cat-grid {
+    --tile-min: 4.25rem;
+    --tile-pad: 0.625rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+/* and in the scrolling layout the catalog's own padding gives up some height too (the pause button still clears the grid at the end) */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-height: 34rem) {
+  .cat-track:not([data-static]) .cat-catalog {
+    padding-block: 0.75rem 3.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-preview__dot {
+    animation: none;
+  }
+}
+
+/*
+ * The inspector (the dialog in ProductCategories.tsx) opens from the tile that was
+ * pressed (the component sets --ox / --oy, the tile's centre in the panel's own
+ * coordinates, before first paint) and leaves in about 60% of the time it took to
+ * arrive. Reduced motion: it simply appears and goes.
+ */
+/* the dialog sits above the page (the one page-level layer it needs: --z-modal in globals.css) */
+.cat-modal {
+  --cat-modal-z-close: 1;
+
+  z-index: var(--z-modal);
+}
+/*
+ * The close button's row: it has no height, so nothing is pushed down, and it sticks
+ * to the top of the panel while the panel scrolls, so the way out is always in reach
+ * (the button was absolute inside the scrolling panel and scrolled away with it). It
+ * sits above the heading's plate, which is positioned too.
+ */
+.cat-modal__close-row {
+  position: sticky;
+  top: 0.75rem;
+  z-index: var(--cat-modal-z-close);
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+}
+
+@keyframes cat-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.84);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cat-modal-out {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes cat-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cat-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cat-modal__panel {
+    transform-origin: var(--ox, 50%) var(--oy, 50%);
+    animation: cat-modal-in 460ms var(--ease-out) both;
+  }
+  .cat-modal__scrim {
+    animation: cat-scrim-in 320ms ease-out both;
+  }
+  .cat-modal[data-closing] .cat-modal__panel {
+    animation: cat-modal-out 220ms ease-in both;
+  }
+  .cat-modal[data-closing] .cat-modal__scrim {
+    animation: cat-scrim-out 220ms ease-in both;
+  }
+}
