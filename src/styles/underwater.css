@@ -1,0 +1,1152 @@
+/*
+ * Underwater hero: layout, light and typography.
+ *
+ * Color rule: every color here is a Mechaavo token (var(--color-*)) or a theme
+ * role (var(--ink), var(--page), ...), optionally with opacity via
+ * color-mix(in srgb, <token> N%, transparent). No raw values.
+ *
+ * The scene is high-key: bright sunlit water on the white page. Water, shafts
+ * and haze are translucent token tints laid over --page; fish are dark.
+ *
+ * Height is 100svh (the small viewport) on purpose: the hero is pinned by
+ * ScrollTrigger, and svh stays constant while mobile browser bars show and
+ * hide, so the pin never jumps.
+ *
+ * There is no min-height: one taller than a short screen (a phone on its side, a
+ * very short window) made the hero taller than the screen, which pushed the call to
+ * action and the captions below the fold for good. A short screen
+ * gets a compact layout instead (see "a short screen" below).
+ */
+
+.hero-root {
+  /*
+   * Z-index scale, back to front. The only place layer order is defined.
+   * Water first, then the caustic light on it (under the lure, so the lure stays
+   * a solid object and is never washed out), then the lure, the copy over the lure
+   * (the lure swims in behind the words, never across them), the front canvas
+   * (fish passing in front of everything), then the statement, captions and nav.
+   */
+  --z-bg: 0;
+  --z-light: 1;
+  --z-back: 2;
+  --z-caustic: 3;
+  --z-lure: 4;
+  --z-copy: 5;
+  --z-front: 6;
+  --z-statement: 8;
+  --z-captions: 9;
+  --z-nav: 10;
+
+  /*
+   * The hero is stuck to the top of the screen while the story plays out over
+   * the scroll distance of its track (.hero-track). The next section is pulled
+   * up over it like a curtain (.story-sheet), so the scene is never replaced by
+   * a blank screen: the catch, the statement and the water stay in view until
+   * the page's own ground rises over them.
+   */
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: var(--page);
+}
+
+/*
+ * Content column. Holds nav, copy, lure and captions to the same max-width and
+ * gutters as the rest of the page (.page-container), so the hero's left edge
+ * lines up with the sections below at every screen size. The water around it
+ * stays full-bleed. No stacking context here: children join the hero's z-scale.
+ */
+/*
+ * The scroll distance the hero's story plays over. By default it is just the
+ * hero; with scripting and motion allowed it is several screens tall (set in
+ * the layout section at the end), and the hero sticks inside it. The story
+ * section that follows overlaps the last screen of it.
+ */
+.hero-track {
+  position: relative;
+}
+
+.hero-stage {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  width: min(100%, var(--page-max));
+  margin-inline: auto;
+  pointer-events: none;
+}
+
+/*
+ * Arrival. The text, nav and lure arrive with CSS keyframes, not GSAP, so the
+ * entrance starts at first paint instead of waiting for hydration (this is what
+ * keeps Largest Contentful Paint early on slow phones, and it works with
+ * JavaScript off). `backwards` fill holds the opening state during each delay and
+ * then hands the element back to its normal style, so later GSAP tweens on the
+ * same element are never overridden.
+ */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@keyframes hero-mask-up {
+  from {
+    transform: translateY(115%);
+  }
+}
+/* transform only: the text is already fully opaque at first paint, which is what
+   lets it count as the Largest Contentful Paint right away */
+@keyframes hero-slide {
+  from {
+    transform: translateY(18px);
+  }
+}
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-nav {
+    animation: hero-fade 800ms var(--ease-out) 150ms backwards;
+  }
+  .hero-kicker {
+    animation: hero-rise 750ms var(--ease-out) 150ms backwards;
+  }
+  .hero-title .hero-line__inner {
+    animation: hero-mask-up 900ms var(--ease-out) 60ms backwards;
+  }
+  .hero-title .hero-line:nth-child(2) .hero-line__inner {
+    animation-delay: 170ms;
+  }
+  .hero-tagline,
+  .hero-lede {
+    animation: hero-slide 650ms var(--ease-out) 150ms backwards;
+  }
+  .hero-lede {
+    animation-delay: 230ms;
+  }
+  div[data-hero="support-item"] {
+    animation: hero-rise 650ms var(--ease-out) 320ms backwards;
+  }
+}
+
+/*
+ * Canvas guard. The canvases are blank until the engine starts, so they wait
+ * (hidden) for MechaavoHero to mark the root `data-ready` and are faded in by
+ * the intro timeline.
+ */
+.hero-root:not([data-ready]) [data-hero="canvas"] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ————————————————————————— water & light ————————————————————————— */
+
+/* Water column. The root is --page (white); everything here is a translucent tint on it. */
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-bg);
+  will-change: transform;
+  background:
+    /* sun glare arriving from the surface, upper left */
+    radial-gradient(
+      ellipse 72% 48% at 28% -10%,
+      color-mix(in srgb, var(--color-white) 95%, transparent),
+      transparent 74%
+    ),
+    /* luminous cyan pool around the lure: the one place the accent shows in the water */
+    radial-gradient(
+      ellipse 52% 58% at 66% 50%,
+      color-mix(in srgb, var(--color-accent-secondary) 17%, transparent),
+      transparent 72%
+    ),
+    /* clear at the top, bluer with depth */
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--color-primary) 9%, transparent) 36%,
+      color-mix(in srgb, var(--color-primary) 20%, transparent) 70%,
+      color-mix(in srgb, var(--color-primary) 30%, transparent) 100%
+    );
+}
+
+.hero-rays {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-light);
+  pointer-events: none;
+}
+
+.hero-ray {
+  position: absolute;
+  top: -14%;
+  left: var(--ray-x);
+  width: var(--ray-w);
+  height: 128%;
+  transform-origin: 50% 0;
+  transform: rotate(var(--ray-r));
+}
+
+/* shafts are brighter than the water around them, so they carry on well into the blue */
+.hero-ray__beam {
+  width: 100%;
+  height: 100%;
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-white) var(--ray-a), transparent) 0%,
+    color-mix(in srgb, var(--color-white) calc(var(--ray-a) * 0.75), transparent) 48%,
+    transparent 92%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--color-white) 35%,
+    var(--color-white) 65%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--color-white) 35%,
+    var(--color-white) 65%,
+    transparent
+  );
+  will-change: transform, opacity;
+}
+
+.hero-ray--accent .hero-ray__beam {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent-secondary) var(--ray-a), transparent) 0%,
+    color-mix(in srgb, var(--color-accent-secondary) calc(var(--ray-a) * 0.6), transparent) 50%,
+    transparent 92%
+  );
+}
+
+/* a lift of mist mid-column pushes the far water back */
+.hero-haze {
+  position: absolute;
+  inset: -4% -8% 0;
+  z-index: var(--z-light);
+  pointer-events: none;
+  opacity: 0.65;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 18%,
+      color-mix(in srgb, var(--color-white) 34%, transparent) 52%,
+      transparent 84%
+    ),
+    radial-gradient(
+      ellipse 70% 38% at 28% 72%,
+      color-mix(in srgb, var(--color-white) 40%, transparent),
+      transparent 70%
+    );
+}
+
+/* deeper water at the corners */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-back);
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 88% 80% at 58% 48%,
+    transparent 46%,
+    color-mix(in srgb, var(--color-primary) 22%, transparent) 100%
+  );
+}
+
+.hero-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.hero-canvas--back {
+  z-index: var(--z-back);
+}
+.hero-canvas--front {
+  z-index: var(--z-front);
+}
+
+/* ————————————————————————— lure ————————————————————————— */
+
+/*
+ * Un-transformed frame: its centre is the camera's focus point and where the
+ * lure floats. The lure is small, a fraction of the width (about 14% at laptop
+ * and desktop sizes) and well smaller than the hero fish that takes it
+ * (FISH_TO_LURE in lib/hero/lureConfig.ts); every fish in the water is sized
+ * from it, so making it smaller calms the whole scene.
+ *
+ * It stays hidden until the engine has started (it sets `data-lure` on the hero),
+ * because the lure's first appearance is the swim in from the logo. Without
+ * script it simply shows; and if the engine never starts, it shows after a few
+ * seconds anyway.
+ */
+.hero-lure-slot {
+  position: absolute;
+  z-index: var(--z-lure);
+  top: 0;
+  left: 60%;
+  width: clamp(150px, 13vw, 205px);
+  height: 100%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  animation: hero-lure-failsafe 1ms linear 5s forwards;
+}
+.hero-root[data-lure] .hero-lure-slot {
+  opacity: 1;
+}
+@media (scripting: none) {
+  .hero-lure-slot {
+    opacity: 1;
+  }
+}
+@keyframes hero-lure-failsafe {
+  to {
+    opacity: 1;
+  }
+}
+/* from a laptop width the headline has room to spare: the lure sits a little further right and a little smaller (the stacked layout below overrides both) */
+@media (min-width: 1280px) {
+  .hero-lure-slot {
+    left: 61.5%;
+    width: clamp(160px, 12vw, 215px);
+  }
+}
+
+.hero-lure {
+  width: 100%;
+  will-change: transform;
+}
+.hero-lure__pull {
+  /* floats, tilts and grows about the nose, where the line holds it */
+  transform-origin: 93% 41%;
+}
+/* pull and shake are written every frame by the engine's lure rig */
+.hero-lure__pull,
+.hero-lure__shake {
+  will-change: transform;
+}
+.hero-lure__art {
+  position: relative;
+  width: 100%;
+}
+/* a photo cut-out gets a soft cast shadow, tinted to the water */
+.hero-lure__photo {
+  filter: drop-shadow(0 26px 28px color-mix(in srgb, var(--color-secondary) 26%, transparent));
+}
+
+/*
+ * The procedural lure (components/hero/LureArt.tsx): nested full-size layers.
+ * Every part moves on its own transform (lib/underwater/lureRig.ts), so the
+ * artwork inside each layer is painted once and only composited afterwards.
+ */
+.lure {
+  position: absolute;
+  inset: 0;
+}
+.lure__part {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.lure__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+/* the silhouette, blurred and set a little below and behind the lure */
+.lure__shadow {
+  position: absolute;
+  left: 1.2%;
+  top: 6.5%;
+  width: 100%;
+  height: 100%;
+  opacity: 0.42;
+  filter: blur(14px);
+  will-change: transform;
+}
+/* the specular band slides in percent of the artwork's width */
+.lure__spec {
+  transform-box: view-box;
+}
+
+.hero-anchor {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  margin: -1px 0 0 -1px;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ————————————————————————— caustic light ————————————————————————— */
+
+/*
+ * Dappled light from the surface, laid over the water and the fish behind the
+ * lure (never over the lure itself, which stays solid). The tile itself is
+ * generated by the engine (lib/underwater/caustics.ts) and handed over as
+ * --caustic-tile on the page root, where the story section below borrows it too.
+ * Two layers at different scales drift in opposite directions; each is one tile
+ * larger than the hero so the drift can wrap without a seam. The mask keeps it
+ * strongest near the surface.
+ */
+.hero-caustics {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-caustic);
+  overflow: hidden;
+  pointer-events: none;
+  /* the light arrives a moment after the water, once the tile is ready */
+  opacity: 0;
+  transition: opacity 2.4s ease-out;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--color-white) 0%,
+    var(--color-white) 30%,
+    transparent 82%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--color-white) 0%,
+    var(--color-white) 30%,
+    transparent 82%
+  );
+}
+:root[data-caustic] .hero-caustics {
+  opacity: 1;
+}
+.hero-caustics__layer {
+  position: absolute;
+  top: calc(var(--tile) * -1);
+  left: 0;
+  width: calc(100% + var(--tile));
+  height: calc(100% + var(--tile));
+  background-image: var(--caustic-tile);
+  background-size: var(--tile) var(--tile);
+  will-change: transform;
+  animation: caustic-drift var(--drift) linear infinite;
+}
+.hero-caustics__layer--a {
+  --tile: 640px;
+  --drift: 46s;
+  opacity: 0.24;
+}
+.hero-caustics__layer--b {
+  --tile: 420px;
+  --drift: 61s;
+  opacity: 0.16;
+  animation-direction: reverse;
+}
+/* the light slides downstream with the current (toward the lure's tail) */
+@keyframes caustic-drift {
+  to {
+    transform: translate3d(calc(var(--tile) * -1), var(--tile), 0);
+  }
+}
+
+/* ————————————————————————— copy ————————————————————————— */
+
+.hero-copy-slot {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-copy);
+  display: flex;
+  align-items: center;
+  padding: 5rem var(--page-pad) 13svh;
+  pointer-events: none;
+}
+
+.hero-copy {
+  width: 100%;
+  max-width: min(44rem, 46vw);
+}
+/* the skip link's landing spot (app/layout.tsx): focus goes here so the next Tab reaches the call to action, but the block is not a control, so no ring around all of it */
+.hero-copy:focus {
+  outline: none;
+}
+
+.hero-kicker {
+  margin-bottom: 1.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* capped: past a 1600px column the headline would run into the lure */
+.hero-title {
+  font-size: clamp(2.5rem, 4.6vw, 4.6rem);
+}
+.hero-statement {
+  font-size: clamp(2.4rem, 5.6vw, 5.8rem);
+}
+
+/* mask each line so it can slide up into view */
+.hero-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.hero-line__inner {
+  display: inline-block;
+  will-change: transform;
+}
+
+.hero-support {
+  margin-top: clamp(1.5rem, 4svh, 2.5rem);
+}
+.hero-tagline {
+  font-size: clamp(1rem, 1.5vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+}
+.hero-lede {
+  max-width: min(30rem, 34vw);
+  margin-top: 0.9rem;
+  /* running text: 16px at the least */
+  font-size: clamp(1rem, 0.9rem + 0.3vw, 1.1rem);
+  line-height: 1.65;
+  text-wrap: pretty;
+  color: var(--ink-soft);
+}
+
+/* the cast plate on hover is tide-button.css (class tide-btn): the lift and the arrow's nudge below stay */
+.hero-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+  padding: 0.95rem 1.5rem;
+  pointer-events: auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--on-accent);
+  background-color: var(--accent);
+  transition:
+    transform 300ms var(--ease-out),
+    box-shadow 300ms var(--ease-out);
+}
+.hero-cta:focus-visible {
+  transform: translateY(-2px);
+  /* tinted to the water, never a black drop shadow */
+  box-shadow: 0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+}
+/* the same lift and nudge for a pointer; on touch :hover would stay stuck after a tap */
+@media (hover: hover) {
+  .hero-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  }
+  .hero-cta:hover svg {
+    transform: translateX(3px);
+  }
+}
+.hero-cta:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+.hero-cta svg {
+  transition: transform 300ms var(--ease-out);
+}
+
+/*
+ * Second statement: it arrives with the catch. The engine sets `data-caught` on
+ * the hero the moment a fish is hooked (and clears it if the fish gets away), and
+ * everything below is a plain CSS transition off that attribute, so the words
+ * come in on the bite however fast or slowly the page was scrolled. It sits in
+ * the upper left, above the fight, which plays out on the right and below.
+ */
+.hero-statement-slot {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-statement);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: clamp(6.25rem, 15svh, 9.5rem) var(--page-pad) 3rem;
+  pointer-events: none;
+  /*
+   * Unseen until the catch (and for good under reduced motion, where there is no
+   * catch). It is hidden by opacity, not visibility, so the words stay in the page
+   * for screen readers, find-in-page and search: they are brand copy, not decoration.
+   */
+  opacity: 0;
+  transition: opacity 380ms ease-out;
+}
+.hero-root[data-caught] .hero-statement-slot {
+  opacity: 1;
+  transition: opacity 260ms ease-out;
+}
+/* each line slides up out of its mask, one after another */
+.hero-statement-slot .hero-line__inner {
+  transform: translateY(115%);
+  transition: transform 380ms var(--ease-out);
+}
+.hero-root[data-caught] .hero-statement-slot .hero-line__inner {
+  transform: none;
+  transition: transform 950ms var(--ease-out) calc(var(--i, 0) * 150ms + 100ms);
+}
+/*
+ * A soft wash of the page color behind the words keeps them legible over the
+ * rays and the water; it fades in and out with the text.
+ */
+.hero-statement-slot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 58% 62% at 16% 26%,
+    color-mix(in srgb, var(--page) 78%, transparent),
+    color-mix(in srgb, var(--page) 38%, transparent) 55%,
+    transparent 100%
+  );
+}
+.hero-statement__sub {
+  max-width: 28rem;
+  margin-top: 1.5rem;
+  font-size: clamp(0.95rem, 1.3vw, 1.15rem);
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 300ms ease-out,
+    transform 300ms ease-out;
+}
+.hero-root[data-caught] .hero-statement__sub {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 700ms ease-out 700ms,
+    transform 700ms var(--ease-out) 700ms;
+}
+
+/*
+ * Hero headings, in the colours of the heading system (components/ui/Tide.tsx):
+ * the same ink-dipped-in-water letters, a plate behind the payoff word and a drop
+ * for the full stop. The title's plate and drop follow its lines in on arrival
+ * (the --pd / --dd delays are set on the h1); the statement's follow the catch.
+ * The drop falls a short way here: the line masks would cut a longer fall off.
+ */
+.hero-title .hero-line__inner,
+.hero-statement .hero-line__inner {
+  background: linear-gradient(
+    180deg,
+    var(--color-dark) 22%,
+    var(--color-primary) calc(150% + (1 - var(--tide-dip)) * 500%)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-line {
+  --tide-fall: -0.5em;
+}
+/* Windows high contrast removes background images, which would leave a transparent fill with nothing behind it: back to the system text colour. Later in the file than the rule above on purpose. */
+@media (forced-colors: active) {
+  .hero-title .hero-line__inner,
+  .hero-statement .hero-line__inner {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  /* the water rises in the title's letters once its lines are in, and in the statement's once it arrives */
+  .hero-title .hero-line__inner {
+    animation:
+      hero-mask-up 900ms var(--ease-out) 60ms backwards,
+      tide-dip 1800ms var(--ease-out) 900ms backwards;
+  }
+  .hero-title .hero-line:nth-child(2) .hero-line__inner {
+    animation-delay: 170ms, 1010ms;
+  }
+  .hero-root[data-caught] .hero-statement .hero-line__inner {
+    animation: tide-dip 1800ms var(--ease-out) calc(var(--i, 0) * 150ms + 900ms) backwards;
+  }
+  .hero-statement .tide__plate {
+    transform: scaleX(0) skewX(var(--tide-skew));
+  }
+  .hero-statement .tide__drop {
+    opacity: 0;
+  }
+  .hero-root[data-caught] .hero-statement .tide__plate {
+    animation: tide-plate 820ms cubic-bezier(0.7, 0, 0.2, 1) 780ms both;
+  }
+  .hero-root[data-caught] .hero-statement .tide__glint {
+    animation: tide-glint 1300ms ease-in-out 1550ms both;
+  }
+  .hero-root[data-caught] .hero-statement .tide__drop {
+    animation: tide-drop 900ms 1250ms both;
+  }
+  .hero-root[data-caught] .hero-statement .tide__ring {
+    animation: tide-ring 1150ms ease-out 1810ms both;
+  }
+  .hero-root[data-caught] .hero-statement .tide__ring--2 {
+    animation-delay: 2010ms;
+  }
+}
+
+/* ————————————————————————— navigation ————————————————————————— */
+
+.hero-nav {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: var(--z-nav);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem var(--page-pad);
+  pointer-events: auto;
+}
+/*
+ * Wide enough that the thin MECHAAVO wordmark under the waves stays readable, narrow
+ * enough that the bar (the lockup plus its padding) is never taller than 80px: 128px
+ * wide is a 66px lockup and a 79px bar.
+ */
+.hero-nav__logo {
+  width: clamp(6.5rem, 9vw, 8rem);
+}
+
+/*
+ * Phones first: the links fold into a menu under the logo's row, behind a Menu button
+ * (HeroNavigation.tsx). From 768px they sit inline, further down.
+ */
+.hero-nav__toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--page) 70%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.hero-nav__toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.hero-nav__menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: var(--page-pad);
+  right: var(--page-pad);
+  padding: 0.35rem 0;
+  background: var(--page);
+  border: 1px solid var(--line);
+}
+.hero-nav__menu[data-open="true"] {
+  display: block;
+  animation: hero-fade 220ms var(--ease-out) backwards;
+}
+.hero-nav__list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hero-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/*
+ * No script on a phone: the Menu button could not open, so the links are laid out as
+ * a row under the logo instead (the hero copy makes room, see the no-script rule below).
+ */
+@media (scripting: none) {
+  .hero-nav {
+    flex-wrap: wrap;
+  }
+  .hero-nav__toggle {
+    display: none;
+  }
+  .hero-nav__menu {
+    position: static;
+    display: block;
+    flex: 1 0 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .hero-nav__list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
+  }
+  .hero-nav__link {
+    min-height: 44px;
+    padding: 0;
+  }
+}
+
+/* from 768px the links sit inline beside the logo */
+@media (min-width: 768px) {
+  .hero-nav {
+    flex-wrap: nowrap;
+  }
+  .hero-nav__toggle {
+    display: none;
+  }
+  .hero-nav__menu {
+    position: static;
+    display: block;
+    flex: 0 1 auto;
+    padding: 0;
+    background: none;
+    border: 0;
+    animation: none;
+  }
+  .hero-nav__list {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: clamp(1.25rem, 3vw, 2.75rem);
+  }
+  /*
+   * A link wears the cast plate on hover and focus (tide-btn, tide-button.css). The
+   * padding gives the plate room around the word and the equal negative margin takes
+   * it back, so the links sit exactly where they did and the bar does not grow.
+   */
+  .hero-nav__link {
+    display: block;
+    min-height: 0;
+    margin: -0.7em -0.9em;
+    padding: 0.7em 0.9em;
+  }
+}
+/* a touch screen at nav width (a tablet): targets 44px tall and 8px apart, by the same trick, so the bar still does not grow */
+@media (min-width: 768px) and (pointer: coarse) {
+  .hero-nav__link {
+    margin: -1.05em -0.55em;
+    padding: 1.05em 0.55em;
+  }
+}
+
+/* ————————————————————————— story captions ————————————————————————— */
+
+/* One small line at a time, bottom left, aligned to the copy's left edge. */
+.hero-captions {
+  position: absolute;
+  z-index: var(--z-captions);
+  left: var(--page-pad);
+  bottom: clamp(1.4rem, 5svh, 3rem);
+  pointer-events: none;
+}
+.hero-caption {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  /* full ink, not the muted tone: the captions sit on the seabed, where muted gray fell to about 2:1 */
+  color: var(--ink);
+}
+/* the timeline reveals the rest; without it only the first caption exists */
+.hero-caption:not(:first-child) {
+  visibility: hidden;
+}
+
+/* ————————————————————————— responsive layouts ————————————————————————— */
+
+/*
+ * Two layouts. "Split" (landscape, copy left / lure right) and "stacked"
+ * (phones and any portrait viewport, incl. tablets: copy above, lure centred).
+ * The stacked query must match STACKED_QUERY in lib/underwater/quality.ts;
+ * the timeline and the fish path switch layouts with the same rule.
+ */
+
+/* (the split layout is the base: the lure slot, the copy slot and the nav above; a laptop width widens the lure's share at 1280px) */
+
+@media (max-width: 767px), (max-aspect-ratio: 1/1) {
+  /* lure below the copy, a touch below the middle; the hero fish swims in beside it */
+  .hero-lure-slot {
+    left: 38%;
+    width: clamp(130px, 28vw, 175px);
+    padding-top: 16svh;
+  }
+  .hero-copy-slot {
+    align-items: flex-start;
+    padding-top: 5.6rem;
+  }
+  .hero-copy {
+    max-width: 100%;
+  }
+  /*
+   * Sized so "FOR EVERY CAST." also fits on one line in the fallback font that
+   * shows while Raleway loads (Arial Bold is about 13% wider in capitals). If
+   * it wrapped there, the headline would grow a line and jump back when the web
+   * font arrives, shoving the call to action 40px.
+   */
+  .hero-title {
+    font-size: clamp(2rem, 9.6vw, 4.2rem);
+  }
+  .hero-statement {
+    font-size: clamp(2.2rem, 11vw, 4.8rem);
+  }
+  .hero-lede {
+    display: none;
+    max-width: 34rem;
+  }
+  .hero-support {
+    margin-top: 1rem;
+  }
+  .hero-cta {
+    margin-top: 1.1rem;
+    padding: 0.8rem 1.2rem;
+  }
+  .hero-statement-slot {
+    padding-top: 6.5rem;
+  }
+  .hero-statement-slot::before {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--page) 86%, transparent) 0%,
+      color-mix(in srgb, var(--page) 55%, transparent) 40%,
+      transparent 72%
+    );
+  }
+}
+
+/* tablets in portrait: room for the supporting paragraph, lure sits lower */
+@media (min-width: 640px) and (max-aspect-ratio: 1/1) {
+  .hero-lede {
+    display: block;
+  }
+  .hero-support {
+    margin-top: 1.5rem;
+  }
+  .hero-lure-slot {
+    left: 35%;
+    width: clamp(140px, 24vw, 190px);
+    padding-top: 22svh;
+  }
+}
+
+/*
+ * A short screen: a phone on its side, a very short window, an old small phone with
+ * its bars showing. The hero is exactly the screen (it has no min-height), so the
+ * nav, the copy and the foot have to fit in a few hundred pixels: the nav slims, the
+ * type is sized from the height as well as the width, the supporting paragraph folds
+ * away and the call to action keeps its 44px and stays on the screen. The kicker
+ * stays. The story itself (the water, the lure, the fish) is untouched.
+ */
+@media (max-height: 34rem) {
+  .hero-nav {
+    padding-block: 0.3rem;
+  }
+  .hero-nav__logo {
+    width: 5.75rem;
+  }
+  .hero-copy-slot {
+    padding-top: 4.25rem;
+    padding-bottom: 3.5rem;
+  }
+  .hero-kicker {
+    margin-bottom: 0.9rem;
+  }
+  .hero-title {
+    font-size: clamp(1.5rem, min(4.6vw, 11svh), 2.75rem);
+  }
+  .hero-statement {
+    font-size: clamp(1.75rem, min(5.6vw, 12svh), 3rem);
+  }
+  .hero-support {
+    margin-top: 0.75rem;
+  }
+  .hero-lede {
+    display: none;
+  }
+  .hero-cta {
+    margin-top: 0.9rem;
+    padding-block: 0.8rem;
+  }
+  .hero-statement-slot {
+    padding-top: 4.25rem;
+    padding-bottom: 1.5rem;
+  }
+  /* the hooked fish fights where this line would sit, and dark text over a dark fish does not read: the line goes (the same words close the page, in the commitment section) */
+  .hero-statement__sub {
+    display: none;
+  }
+}
+/* the stacked layout sizes its type from the width of a phone: the same, with the phone's numbers */
+@media (max-height: 34rem) and (max-width: 767px), (max-height: 34rem) and (max-aspect-ratio: 1/1) {
+  .hero-title {
+    font-size: clamp(1.5rem, min(9.6vw, 11svh), 2.75rem);
+  }
+  .hero-statement {
+    font-size: clamp(1.75rem, min(11vw, 12svh), 3rem);
+  }
+}
+/*
+ * A phone on its side: the copy is on the left, so the lure sits to its right as in the
+ * split layout. That is what the base rule already says; this restores it where the
+ * stacked layout is in force (a landscape phone under 768px wide), which would put the
+ * lure under the copy, in a screen with no room under it.
+ */
+@media (max-height: 34rem) and (min-aspect-ratio: 1/1) {
+  .hero-lure-slot {
+    left: 60%;
+    width: clamp(150px, 13vw, 205px);
+    padding-top: 0;
+  }
+}
+
+/*
+ * No script (the Menu button could not open, so the nav links are laid out as a row
+ * under the logo: see the nav section). On a 320px phone the three links wrap to two
+ * rows, so the copy starts lower; from 640px they fit beside the logo and the nav is
+ * one row again. A phone on its side has no room for the kicker as well. Last in the
+ * file on purpose: each rule below overrides the ones before it.
+ */
+@media (scripting: none) and (max-width: 767px), (scripting: none) and (max-aspect-ratio: 1/1) {
+  .hero-copy-slot {
+    padding-top: 9.5rem;
+  }
+}
+@media (scripting: none) and (min-width: 40rem) {
+  .hero-nav {
+    flex-wrap: nowrap;
+  }
+  .hero-nav__menu {
+    flex: 0 1 auto;
+  }
+}
+@media (scripting: none) and (min-width: 40rem) and (max-width: 767px), (scripting: none) and (min-width: 40rem) and (max-aspect-ratio: 1/1) {
+  .hero-copy-slot {
+    padding-top: 5.6rem;
+  }
+}
+@media (scripting: none) and (max-height: 34rem) and (min-aspect-ratio: 1/1) {
+  .hero-copy-slot {
+    padding-top: 7rem;
+  }
+  .hero-kicker {
+    display: none;
+  }
+}
+@media (scripting: none) and (max-height: 34rem) and (min-aspect-ratio: 1/1) and (min-width: 40rem) {
+  .hero-copy-slot {
+    padding-top: 4.25rem;
+  }
+  .hero-kicker {
+    display: block;
+  }
+}
+
+/* phones: lighter water, fewer light shafts, one layer of caustic light (from 768px the full scene) */
+.hero-ray:nth-child(n + 4) {
+  display: none;
+}
+.hero-caustics__layer--b {
+  display: none;
+}
+@media (min-width: 768px) {
+  .hero-ray:nth-child(n + 4) {
+    display: block;
+  }
+  .hero-caustics__layer--b {
+    display: block;
+  }
+}
+
+/*
+ * The scroll distance of the hero's story (see .hero-track): the hero's own
+ * screen, the story itself, and one more screen while the next section slides
+ * up over it (.story-sheet is pulled up by exactly that screen). Only when script
+ * can run the story and motion is allowed; otherwise the hero is one still
+ * screen and the sections simply follow it. The timeline measures the track, so
+ * these numbers are the only place the length is set (the story is 2 screens
+ * shorter than the track).
+ */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .hero-track {
+    --hero-screens: 6.1;
+    height: calc(100svh * var(--hero-screens));
+  }
+  .story-sheet {
+    margin-top: -100svh;
+  }
+}
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-width: 767px),
+  (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-aspect-ratio: 1/1) {
+  .hero-track {
+    --hero-screens: 5.2;
+  }
+}
+
+/*
+ * Lite mode. The engine sets `data-lite` on the hero if it measures that the
+ * device cannot hold frame rate, and sheds the costliest compositing first:
+ * the caustic light, the blurred shadow and the extra shafts.
+ */
+.hero-root[data-lite] .hero-caustics {
+  display: none;
+}
+.hero-root[data-lite] .lure__shadow {
+  filter: none;
+  opacity: 0.12;
+}
+.hero-root[data-lite] .hero-ray:nth-child(n + 4) {
+  display: none;
+}
+
+/* ————————————————————————— reduced motion ————————————————————————— */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-caustics__layer {
+    animation: none;
+  }
+  .hero-cta,
+  .hero-cta svg {
+    transition: none;
+  }
+}
