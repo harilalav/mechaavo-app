@@ -1,6 +1,8 @@
 import { MechaavoHero } from "@/components/hero/MechaavoHero";
 import { ProductCategories } from "@/components/showcase/ProductCategories";
 import { BrandStory } from "@/components/showcase/BrandStory";
+import { SectionJumps } from "@/components/ui/SectionJumps";
+import { SiteNavigation } from "@/components/ui/SiteNavigation";
 import { TideObserver } from "@/components/ui/TideObserver";
 import { readLureAsset } from "@/lib/hero/lureAsset.server";
 
@@ -13,7 +15,9 @@ export default function Home() {
       <MechaavoHero lureAsset={lureAsset} />
       <ProductCategories />
       <BrandStory />
+      <SiteNavigation />
       <TideObserver />
+      <SectionJumps />
     </main>
   );
 }

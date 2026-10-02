@@ -1,0 +1,19 @@
+/*
+ * The veil a jump to a section dips through (components/ui/SectionJumps.tsx, timings
+ * and reasoning in lib/animations/sectionJump.ts): the page's own white, one fixed
+ * layer, invisible and inert until the script fades its opacity. Nothing here lays out.
+ */
+.section-veil {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-veil);
+  background-color: var(--page);
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (forced-colors: active) {
+  .section-veil {
+    background-color: Canvas;
+  }
+}

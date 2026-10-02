@@ -1,0 +1,159 @@
+/*
+ * The sticky bar (components/ui/SiteNavigation.tsx): the hero nav's second state, shown
+ * from #story on. The page white with a hairline under it, square cornered like the page,
+ * 64px tall (the hero's cap is 80). Its links wear the same cast plate (tide-btn) and use
+ * the same fold as the hero nav: a Menu button under 768px, inline links from there.
+ */
+.site-nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: var(--z-bar);
+  background-color: var(--page);
+  border-bottom: 1px solid var(--line);
+  transform: translateY(-100%);
+  opacity: 0;
+}
+.site-nav[data-show="true"] {
+  transform: none;
+  opacity: 1;
+}
+
+/* leaving is about 65% of arriving; reduced motion: no slide, the bar simply is or is not there */
+@media (prefers-reduced-motion: no-preference) {
+  .site-nav {
+    transition:
+      transform 200ms var(--ease-out),
+      opacity 200ms var(--ease-out);
+  }
+  .site-nav[data-show="true"] {
+    transition-duration: 300ms;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-nav {
+    transform: none;
+  }
+}
+
+/* without script nothing could show it, and the hero nav is a plain row of links there */
+@media (scripting: none) {
+  .site-nav {
+    display: none;
+  }
+}
+
+.site-nav__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4rem;
+}
+.site-nav__logo {
+  width: 6rem;
+}
+
+/* phones first: the links fold into a menu under the bar, behind a Menu button */
+.site-nav__toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.site-nav__toggle svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.site-nav__menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: var(--page-pad);
+  right: var(--page-pad);
+  padding: 0.35rem 0;
+  background: var(--page);
+  border: 1px solid var(--line);
+}
+.site-nav__menu[data-open="true"] {
+  display: block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .site-nav__menu[data-open="true"] {
+    animation: hero-fade 220ms var(--ease-out) backwards;
+  }
+}
+.site-nav__list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.site-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  touch-action: manipulation;
+}
+
+/* from 768px the links sit inline beside the logo */
+@media (min-width: 768px) {
+  .site-nav__toggle {
+    display: none;
+  }
+  .site-nav__menu {
+    position: static;
+    display: block;
+    padding: 0;
+    background: none;
+    border: 0;
+  }
+  .site-nav__list {
+    flex-direction: row;
+    align-items: center;
+    gap: clamp(1.25rem, 3vw, 2.75rem);
+  }
+  /* padding for the plate to sit in, taken back by the equal negative margin, so the links sit where they would without it */
+  .site-nav__link {
+    display: block;
+    min-height: 0;
+    margin: -0.7em -0.9em;
+    padding: 0.7em 0.9em;
+  }
+}
+/* a touch screen at nav width (a tablet): 44px targets, 8px apart, by the same trick */
+@media (min-width: 768px) and (pointer: coarse) {
+  .site-nav__link {
+    margin: -1.05em -0.55em;
+    padding: 1.05em 0.55em;
+  }
+}
+
+/* a phone on its side, a very short window: a slimmer bar (the Menu button keeps its 44px) */
+@media (max-height: 34rem) {
+  .site-nav__inner {
+    min-height: 3.25rem;
+  }
+  .site-nav__logo {
+    width: 4.75rem;
+  }
+}
