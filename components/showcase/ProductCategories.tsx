@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowRightIcon,
@@ -9,7 +10,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Mark, Tide } from "@/components/ui/Tide";
-import { CATEGORIES_VIDEO } from "@/lib/config/media";
+import { CATEGORIES_VIDEO, CATEGORY_MEDIA } from "@/lib/config/media";
 import { SECTION_IDS } from "@/lib/config/sections";
 import { useLoopingVideo } from "@/lib/hooks/useLoopingVideo";
 import { whenIdle } from "@/lib/utils/idle";
@@ -463,10 +464,24 @@ export function ProductCategories() {
                         }}
                         className="cat-card group relative overflow-hidden rounded-2xl border border-line text-left focus-visible:outline-2 focus-visible:outline-ink"
                       >
-                        {/* Index & Tag */}
-                        <div className="flex items-center justify-between text-xs text-ink-muted">
-                          <span className="font-bold tracking-wider tabular-nums">0{idx + 1}</span>
-                          <span className="cat-card__more rounded-md border border-line/60 bg-page px-2 py-0.5 text-xs font-medium tracking-wide">
+                        {/* The photo (decoration: the button is named by the category's name), with the index on it; src/styles/categories.css grades it with the tokens */}
+                        <span className="cat-card__photo" aria-hidden="true">
+                          {CATEGORY_MEDIA[cat.id] && (
+                            <Image
+                              src={CATEGORY_MEDIA[cat.id].src}
+                              alt=""
+                              fill
+                              sizes="(min-width: 1024px) 24vw, (min-width: 768px) 22vw, 46vw"
+                              quality={70}
+                              className="cat-card__img"
+                            />
+                          )}
+                          <span className="cat-card__index tabular-nums">0{idx + 1}</span>
+                        </span>
+
+                        {/* Tag (roomy screens only) */}
+                        <div className="cat-card__roomy flex items-center text-xs text-ink-muted">
+                          <span className="rounded-md border border-line/60 bg-page px-2 py-0.5 text-xs font-medium tracking-wide">
                             {cat.tag}
                           </span>
                         </div>
@@ -483,7 +498,7 @@ export function ProductCategories() {
 
                         {/* Subcategories tags & action */}
                         <div className="cat-card__foot">
-                          <div className="cat-card__more flex flex-wrap gap-1.5">
+                          <div className="cat-card__roomy flex flex-wrap gap-1.5">
                             {cat.subcategories.slice(0, 2).map((sub) => (
                               <span
                                 key={sub}
@@ -574,6 +589,20 @@ export function ProductCategories() {
                 <XIcon size={20} weight="bold" />
               </button>
             </div>
+
+            {/* The category's photo, to the panel's edges (the close button sits on it) */}
+            {CATEGORY_MEDIA[selectedCategory.id] && (
+              <div className="cat-modal__photo">
+                <Image
+                  src={CATEGORY_MEDIA[selectedCategory.id].src}
+                  alt={CATEGORY_MEDIA[selectedCategory.id].alt}
+                  fill
+                  sizes="(min-width: 672px) 672px, 100vw"
+                  quality={75}
+                  className="cat-card__img"
+                />
+              </div>
+            )}
 
             {/* Modal Header (the right padding keeps a long name from running under the close button) */}
             <div className="pr-14">
