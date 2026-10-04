@@ -30,13 +30,14 @@ export function SiteNavigation() {
   useMenuDismiss(open, close, barRef, buttonRef);
 
   // Past the start of #story? A thin strip along the top edge (2% of the screen) is the
-  // observer's root, and the three story sections tile the page from #story to its end, so
-  // one of them is always in the strip once #story's top has reached it. Any change of who
-  // is in the strip re-reads where #story is: a jump straight from the hero to #principles
-  // never has #story itself cross the strip, which is why it is not the one observed.
+  // observer's root. The three story sections and the contact section tile the page from #story to
+  // its end (the footer is shorter than the screen, so the strip never lies in it), so one of them
+  // is always in the strip once #story's top has reached it. Any change of who is in the strip
+  // re-reads where #story is: a jump straight from the hero to #principles never has #story itself
+  // cross the strip, which is why it is not the one observed.
   useEffect(() => {
     const story = document.getElementById(SECTION_IDS.story);
-    const sections = [SECTION_IDS.story, SECTION_IDS.principles, SECTION_IDS.commitment]
+    const sections = [SECTION_IDS.story, SECTION_IDS.principles, SECTION_IDS.commitment, SECTION_IDS.contact]
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => el !== null);
     if (!story || !("IntersectionObserver" in window)) return;

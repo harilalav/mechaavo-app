@@ -1,0 +1,163 @@
+/*
+ * The contact links (components/showcase/ContactSection.tsx) and the footer's social buttons
+ * (components/ui/SiteFooter.tsx).
+ *
+ * A contact link is a whole tile: an icon and an arrow on top, what it is and the detail below. Square,
+ * like the page (the rounded family is the categories card's). It wears the cast plate on hover, focus
+ * and press like every button (tide-button.css: the class `tide-btn` is on the markup), so the
+ * transition list keeps `color var(--btn-color)`. Tokens only.
+ */
+
+/*
+ * On a phone a link is a compact row (icon, what it is, an arrow), so four of them stay a short stretch of
+ * scroll; from sm each is a tile with the icon and arrow on top and the detail below.
+ */
+.contact-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.125rem 1.25rem;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  background-color: var(--page);
+  border: 1px solid var(--line);
+  transition:
+    color var(--btn-color),
+    border-color 300ms var(--ease-out),
+    transform 300ms var(--ease-out);
+}
+/* a physical push when pressed */
+.contact-link:active {
+  transform: scale(0.98);
+}
+.contact-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* a phone: no box of its own, so the icon, the text and the arrow are one row */
+.contact-link__top {
+  display: contents;
+}
+.contact-link__arrow {
+  order: 2;
+  margin-left: auto;
+  flex: none;
+  transition: transform 300ms var(--ease-out);
+}
+@media (min-width: 640px) {
+  .contact-link {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 2.5rem;
+    min-height: 11rem;
+    padding: 1.5rem;
+  }
+  .contact-link__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+  .contact-link__arrow {
+    order: 0;
+    margin-left: 0;
+  }
+}
+.contact-link:is(:focus-visible, :active) .contact-link__arrow {
+  transform: translate(2px, -2px);
+}
+@media (hover: hover) {
+  .contact-link:hover {
+    border-color: transparent;
+  }
+  .contact-link:hover .contact-link__arrow {
+    transform: translate(2px, -2px);
+  }
+}
+
+.contact-link__text {
+  display: block;
+  min-width: 0;
+  flex: 1;
+}
+/* what it is: a label of one word, 12px is the floor */
+.contact-link__label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  transition: color var(--btn-color);
+}
+.contact-link:is(:focus-visible, :active) .contact-link__label {
+  color: var(--ink);
+}
+@media (hover: hover) {
+  .contact-link:hover .contact-link__label {
+    color: var(--ink);
+  }
+}
+.contact-link__value {
+  display: block;
+  font-size: clamp(1.125rem, 1rem + 0.6vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-link,
+  .contact-link__arrow {
+    transition: none;
+  }
+  .contact-link:is(:focus-visible, :active) .contact-link__arrow {
+    transform: none;
+  }
+  .contact-link:active {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .contact-link:hover .contact-link__arrow {
+    transform: none;
+  }
+}
+
+/* the footer's social buttons: 44px squares, 8px apart (the list's gap) */
+.footer-social {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  background-color: color-mix(in srgb, var(--page) 70%, transparent);
+  border: 1px solid var(--line);
+  transition:
+    color var(--btn-color),
+    transform 300ms var(--ease-out);
+}
+.footer-social:active {
+  transform: scale(0.96);
+}
+.footer-social:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer-social {
+    transition: none;
+  }
+  .footer-social:active {
+    transform: none;
+  }
+}

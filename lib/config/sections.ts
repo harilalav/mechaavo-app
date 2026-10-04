@@ -2,13 +2,14 @@
  * Page sections and the links that point at them, in one place, so a label and
  * its target can never drift apart (and no two links share a destination).
  *
- * Page order: hero, then #story, #principles, #commitment.
+ * Page order: hero, #categories, #story, #principles, #commitment, #contact.
  */
 export const SECTION_IDS = {
   categories: "categories",
   story: "story",
   principles: "principles",
   commitment: "commitment",
+  contact: "contact",
 } as const;
 
 /**
@@ -20,6 +21,7 @@ export const NAV_LINKS = [
   { label: "Philosophy", href: `#${SECTION_IDS.story}` },
   { label: "Principles", href: `#${SECTION_IDS.principles}` },
   { label: "Commitment", href: `#${SECTION_IDS.commitment}` },
+  { label: "Contact", href: `#${SECTION_IDS.contact}` },
 ] as const;
 
 /**
