@@ -34,8 +34,12 @@
 }
 
 .cat-track {
-  /* scroll distance of the whole opening = (screens - 1) viewport heights; the only place it is set */
-  --cat-screens: 3;
+  /*
+   * scroll distance of the whole opening = (screens - 1) viewport heights; the only place it is set. A
+   * quarter screen at the start is the card at rest, the card opens over the next 0.6 of a screen, and
+   * the catalog is fully in at about 0.65 of a screen (sweep gate G16 keeps it under 0.75).
+   */
+  --cat-screens: 2.25;
   /*
    * the closed card: portrait, and never wider than the page column on a phone. The
    * column is measured as 100cqw (the stage below is a size container), not 100vw:

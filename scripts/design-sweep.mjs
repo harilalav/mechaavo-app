@@ -1018,7 +1018,16 @@ async function runScreen(browser, screen, o, results) {
     const page = await ctx.newPage();
     await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
     await readyHero(page, true);
-    record("js", "budget", "G16", judgeBudget(await budgetRun(page)));
+    const budget = await budgetRun(page);
+    record("js", "budget", "G16", judgeBudget(budget));
+    const sc = (a, b) => (a === null || b === null ? "n/a" : ((a - b) / budget.vh).toFixed(2));
+    results[results.length - 1].measured = {
+      biteAt: sc(budget.biteY, 0),
+      biteToLift: sc(budget.liftY, budget.biteY),
+      biteToSheet: sc(budget.sheetY, budget.biteY),
+      sheetToCatalog: sc(budget.catalogY, budget.sheetY),
+    };
+    process.stdout.write(`    scroll budget (screens): bite at ${sc(budget.biteY, 0)}, +${sc(budget.liftY, budget.biteY)} to the lure drawn up, +${sc(budget.sheetY, budget.biteY)} to the categories sheet, +${sc(budget.catalogY, budget.sheetY)} sheet to catalog\n`);
     await ctx.close();
   }
 

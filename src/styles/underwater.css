@@ -1101,7 +1101,11 @@
 /*
  * The scroll distance of the hero's story (see .hero-track): the hero's own
  * screen, the story itself, and one more screen while the next section slides
- * up over it (.story-sheet is pulled up by exactly that screen). Only when script
+ * up over it (.story-sheet is pulled up by exactly that screen). The story is 1.9
+ * screens on a landscape layout and 1.5 on a stacked one: the bite lands about 0.6
+ * of a screen down on both, the catch is drawn up a quarter of a screen later, and
+ * the sheet follows soon after (the beats are STORY in lib/underwater/story.ts, and
+ * the sweep's G16 fails when the scroll after the bite grows again). Only when script
  * can run the story and motion is allowed; otherwise the hero is one still
  * screen and the sections simply follow it. The timeline measures the track, so
  * these numbers are the only place the length is set (the story is 2 screens
@@ -1109,7 +1113,7 @@
  */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   .hero-track {
-    --hero-screens: 6.1;
+    --hero-screens: 3.9;
     height: calc(100svh * var(--hero-screens));
   }
   .story-sheet {
@@ -1119,7 +1123,7 @@
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-width: 767px),
   (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-aspect-ratio: 1/1) {
   .hero-track {
-    --hero-screens: 5.2;
+    --hero-screens: 3.5;
   }
 }
 

@@ -59,15 +59,15 @@ const ORDER: readonly PrimaryMode[] = [
 ];
 
 /**
- * Scroll thresholds for levels 1..4 (patrol is level 0). The strike lands a
+ * Scroll thresholds for levels 1..4 (patrol is level 0), from the story's beats. The strike lands a
  * moment after the last one, so the bite falls close to `STORY.caught`.
  */
-const LEVELS = [STORY.curious - 0.02, STORY.approaching, STORY.striking - 0.04, STORY.striking + 0.01] as const;
+const LEVELS = [STORY.notice, STORY.approaching, STORY.windup, STORY.strike] as const;
 /** Mode each level asks for: patrol, inspect, circle, windup, strike (hooked follows the strike). */
 const LEVEL_MODE = [0, 2, 3, 4, 5] as const;
 /** First level at which a hooked fish stays hooked. */
 const HOLD_LEVEL = 4;
-const HYSTERESIS = 0.015;
+const HYSTERESIS = STORY.hysteresis;
 
 /** Fewest seconds spent in a mode before moving on to the next: a fish that bites quickly. */
 const DWELL: Partial<Record<PrimaryMode, number>> = {

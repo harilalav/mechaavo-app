@@ -349,8 +349,9 @@ export function readRigPose(
   const buoyancySwayX = (Math.sin(time * 0.95) * 0.035 + Math.sin(time * 1.9 + 0.6) * 0.018) * length;
   const floatX = rig.px.x * length + buoyancySwayX;
   const floatY = rig.py.x * length + buoyancyBobY;
-  // drawn up the line: it picks up speed as it goes, like a fish being hauled in
-  const lift = Math.pow(clamp(reel, 0, 1), 1.8);
+  // drawn up the line: it picks up speed as it goes, like a fish being hauled in (but it must read as soon as
+  // the scroll asks for it: a higher power left the first fifth of the pull looking like nothing had happened)
+  const lift = Math.pow(clamp(reel, 0, 1), 1.25);
   let x = floatX + rig.trackX.x + rig.reelX * lift;
   let y = floatY + rig.trackY.x + rig.reelY * lift;
   let scale = 1;
