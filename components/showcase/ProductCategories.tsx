@@ -466,7 +466,8 @@ export function ProductCategories() {
                       >
                         {/* The photo (decoration: the button is named by the category's name), with the index on it; src/styles/categories.css grades it with the tokens */}
                         <span className="cat-card__photo" aria-hidden="true">
-                          {CATEGORY_MEDIA[cat.id] && (
+                          {/* fetched once the card is close, like the poster: on a slow connection they would otherwise compete with the font and the first paint (they added 0.4 s to the mobile LCP) */}
+                          {posterWanted && CATEGORY_MEDIA[cat.id] && (
                             <Image
                               src={CATEGORY_MEDIA[cat.id].src}
                               alt=""
