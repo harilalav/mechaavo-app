@@ -2,7 +2,7 @@
 
 How the gates in `docs/DESIGN-GUIDELINES.md` section 13 are run, what they measure, and the dated record of results. Read on demand.
 
-## Screen matrix (27 screens)
+## Screen matrix (29 screens)
 
 CSS pixels; the height is what the browser really shows (bars included), not the device's screen height. `deep` screens also get reduced motion, forced colours, a 200% text run, the scrolled layout-shift run and (non-touch) a classic 15 px scrollbar run.
 
@@ -12,6 +12,8 @@ CSS pixels; the height is what the browser really shows (bars included), not the
 | phone-se | 320 x 480 | 2 | yes | smallest supported portrait (also the 400% reflow case) |
 | phone-360 | 360 x 640 | 3 | yes | |
 | phone-375 | 375 x 600 | 3 | yes | |
+| phone-360s | 360 x 560 | 3 | yes | what a typical Android browser shows (toolbars in): the catalog's overflow case |
+| phone-375s | 375 x 548 | 3 | yes | iPhone SE / mini in Safari (toolbars in) |
 | phone-390 | 390 x 664 | 3 | yes | deep |
 | phone-412 | 412 x 760 | 2.625 | yes | |
 | phone-430 | 430 x 740 | 3 | yes | |
@@ -44,8 +46,8 @@ Each screen is loaded with script on (states: top, caught, catalog, modal, story
 |---|---|---|
 | G1 | document `scrollWidth` with the body's overflow guard switched off, and every unclipped element's right and left edge | nothing is wider than the screen (also with a 15 px scrollbar) |
 | G2 | nav bar height, links per line, logo bounds | at most 80 px, one line, logo inside; a Menu button when the links are folded |
-| G3 | fit: hero (top), statement (caught), catalog (catalog), dialog (modal) | hero not taller than the screen; headline, tagline, CTA, captions and sound button inside it with no overlaps; headline at most 2 lines; CTA one line; statement inside; catalog fits (warning when the screen is shorter than 34rem); dialog panel inside, close button reachable at the end of its content |
-| G4 | every visible interactive element (with the dialog open, only the dialog's) | at least 44 px (coarse pointer) or 24 px; at least 8 px apart on touch, except a floating control over scrolling content (the pause button over a catalog that scrolls on a short screen), which is only size-checked |
+| G3 | fit: hero (top), statement (caught), catalog (catalog), dialog (modal) | hero not taller than the screen; headline, tagline, CTA, captions and sound button inside it with no overlaps; headline at most 2 lines; CTA one line; statement inside; catalog is not a scroller of its own (G17 checks its tiles are reachable); dialog panel inside, close button reachable at the end of its content |
+| G4 | every visible interactive element (with the dialog open, only the dialog's) | at least 44 px (coarse pointer) or 24 px; at least 8 px apart on touch, except a floating control over scrolling content (the pause button over the catalog's sliding content), which is only size-checked |
 | G5 | computed font size of every visible text element | labels 12, secondary 14, running paragraphs 16 (see guidelines section 6) |
 | G6 | the words' own box against the nearest clipping ancestor; 200% text run (warning only) | no text cut sideways |
 | G7 | `layout-shift` entries while loading and (deep) while scrolling the whole page | at most 0.01 |
@@ -57,6 +59,8 @@ Each screen is loaded with script on (states: top, caught, catalog, modal, story
 | G13 | uppercase, tracked, small labels that sit directly above a heading | at most ceil(sections / 3) |
 | G14 | left edge of hero copy, nav logo, captions, statement and every `.page-container` child | within 1.5 px of the column edge |
 | G15 | images, videos, canvases | `alt` present, loaded, sized; video muted, `playsinline`, poster once near, pause control; canvases `pointer-events: none` |
+| G16 | scroll budget (deep screens, a fresh page): one steady gesture (an eighth of a screen every 250 ms) finds the bite; from there the page is scrolled and left to settle | the bite lands 0.55 to 1.15 screens down (the approved one); the lure is drawn up within 0.4 screens of it; the categories sheet is at the top within 2.4; the catalog is fully in within 0.75 of the sheet. Measured 2026-10-04 (laptop / phone): 0.25 / 0.13, 2.02 / 1.75, 0.63 |
+| G17 | the catalog at the end of its card's hold | no scroller inside the card (computed `overflow-y` auto or scroll with overflow), the last tile is on screen (a page-scroll away) |
 
 Sweep allowances live in `scripts/design-allow.json` under `sweep` (`{ gate, match, screens?, reason }`); an allowance that matches nothing is reported.
 
@@ -101,7 +105,8 @@ Text on glass or video: Lighthouse skips elements hidden at load (the catalog), 
 - Firefox and WebKit are not run.
 - Contrast is not part of the sweep (Lighthouse and the pixel sampling above).
 - 280 px wide is best effort: only G1 and G10 gate it.
-- On a screen shorter than 34rem and narrower than 640 px (568 x 320, 320 x 480 portrait) the eight tiles cannot fit, so the catalog scrolls inside itself and the pause button floats over it: reported as a G3 warning, by design (the documented short-screen fallback).
+- On a screen too short for all eight tiles (320 x 480, 568 x 320, and 28 to 41 px short at 360 x 560 and 375 x 548) the timeline slides the catalog's content up while the card is held open; the pause button floats over it. Nothing scrolls inside the card (G3, G17).
+- **Not measured here, to check on a device:** the white strip under a phone's toolbars (headless Chrome has no toolbars: the fix, a stage as tall as `lvh`, was checked by simulating `svh` 560 / `lvh` 664), whether the frosted glass or the multiply-blended water video flickers on iOS Safari while a flick is stopped, and whether the finger that stops a flick triggers a tile's pressed state (headless emulation does not apply `:active` to touches). The hero's bottom edge may show the same strip; if it does, give `.hero-track` the seabed's tone.
 - At 200% text (a deep-screen run, warnings only) long display words break rather than being cut (`overflow-wrap: anywhere` on `.display-type`). A word on a heading plate is `white-space: nowrap` by design, so a long plated word (PERFORMANCE) can still be a few pixels too wide on a 768 px screen: reported, not failed.
 - Mobile LCP is about 2.8 s (Lighthouse mobile, simulated slow 4G, median of three runs 2538 / 2789 / 2791 ms), above the 2.5 s budget and unchanged from before this pass. The LCP element is the hero tagline ("Trusted for every catch."), whose paint is gated by the web font (Raleway) arriving, not by anything on the page. Desktop LCP is 0.6 s. Recorded as a known gap; the fixes that would help (a font swap policy, a lighter first load) change the brand's first paint, so they are a client decision.
 - The "caught" state waits for a real bite; if the bite does not happen within the wait the sweep sets `data-caught` itself and marks the problems `[forced data-caught]`.

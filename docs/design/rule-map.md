@@ -34,7 +34,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | 18 | Eyebrow count | at most ceil(sections / 3) | G13 (lint:eyebrow-count is info) |
 | 19 | Split-header ban | catalog header stacks the explainer under the headline | plan |
 | 20 | Zigzag cap | 5 sections, 5 layout families | plan |
-| 21 | No duplicate CTA intent | no two links share a target | lint:link-unique |
+| 21 | No duplicate CTA intent | no two links share a target (the footer repeats no section link; social profiles live only in the footer) | lint:link-unique |
 | 22 | Logo wall is logo only | no logo wall | n/a |
 | 23 | Bento background diversity | eight equal tiles by brief | D7 |
 | 24 | Trusted-by under the hero | none | n/a |
@@ -156,7 +156,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | container-width | `.page-container` | G14 |
 | z-index-management | tokens only | lint:z-literal |
 | fixed-element-offset | no fixed bars except the dialog | G3, G11 |
-| scroll-behavior | nested scroll only on short screens and in dialogs | G3 |
+| scroll-behavior | nested scroll only in dialogs: nothing in the pinned categories card scrolls by itself, its content slides under the page's scroll; the last tile can be brought on screen | G3, G17 |
 | viewport-units | `svh`, `dvh`, never `vh` | lint:vh-unit |
 | orientation-support | landscape screens in the matrix | G3 |
 | content-priority | the lede folds away on phones | plan |
@@ -231,3 +231,13 @@ All chart rules: **n/a, the site has no charts.**
 | Sticky UI does not obscure focus | none sticky except the dialog close | G11 |
 | Dragging, authentication, forms | none | n/a |
 | Auto-rotating content stops and has controls | video pause, loops end under reduced motion | G15, G8 |
+
+## Added with the hero, categories and page-foot pass (2026-10-04)
+
+| Rule | Where it lands | Check |
+|---|---|---|
+| scroll budget: the scroll between the bite and the catalog stays short (lift 0.4, sheet 2.4, catalog 0.75 screens) | `STORY`, `--hero-screens`, `--cat-screens` | G16 |
+| viewport units: a pinned stage paints to `lvh`, lays out against `svh` | `.cat-stage`, `.cat-view` | manual on a device (headless Chrome has no toolbars), geometry by simulation |
+| natural motion: heading follows the swim direction, turn rate under the cap, few head flips, clear of the lure | `primaryFish.ts` patrol and circle | `npm run fish:sim` |
+| tile photos: decoration inside a tile (`alt=""`), described in the inspector; graded by tokens; never behind text | `CATEGORY_MEDIA`, `.cat-card__photo` | G15, G5, G3 |
+| contact details are real before launch | `lib/config/contact.ts` | lint:contact-placeholder (warn, `--strict` fails) |

@@ -35,7 +35,7 @@ A conflict is never skipped silently. It becomes a numbered deviation (section 1
 - **Smallest supported:** 320 x 480 portrait and 568 x 320 landscape. **Best effort:** 280 wide (foldable cover): no horizontal scroll, no console errors, nothing else gated. **Largest:** 3840 wide.
 - Conditions on top of size: 200% zoom, 400% reflow (that is 320 CSS px), 200% text size, reduced motion, no script, forced colours, touch vs hover, coarse vs fine pointer, landscape.
 - Test with the height the browser really shows. Mobile and laptop browsers show 100 to 120 px less than the screen (iPhone Safari about 390 x 664, a 1366 x 768 laptop about 1366 x 650). `svh` is that smaller height.
-- The full matrix (27 screens) and what each gate measures are in `docs/design/verification.md`.
+- The full matrix (29 screens, two of them the 360 x 560 and 375 x 548 heights a phone browser really shows) and what each gate measures are in `docs/design/verification.md`.
 
 ## 4. Breakpoints and environment queries
 
@@ -57,7 +57,7 @@ Write **mobile-first**: base styles are for the smallest screen, then add `min-w
 
 ## 5. Units, sizing and layout
 
-- **Full-screen stage that is pinned or sticky:** `100svh` (D2). **Dialogs and sheets:** `max-height: 90dvh`. **Backgrounds that may extend under browser bars:** `lvh`. **Never `vh`.** Lint: `vh-unit`.
+- **Full-screen stage that is pinned or sticky:** its content is laid out against `100svh` (D2). **Dialogs and sheets:** `max-height: 90dvh`. **Backgrounds that may extend under browser bars:** `lvh`: a pinned stage whose paint is exactly `100svh` shows the white page under it whenever the toolbars are away, so the categories stage is `100lvh` tall and only its water, window and glass paint to that height (the content sits in a `100svh` box, `.cat-view`). **Never `vh`.** Lint: `vh-unit`.
 - **Never `100vw` for layout** (it includes the scrollbar). Use `100%`, or container units (`cqw`) when a descendant must size against a container. A `sizes` hint on an image may say `100vw`.
 - Text containers use `min-height`, never a fixed `height`. Fixed `height` or `overflow: hidden` on anything that holds text is how text gets clipped at 200% zoom.
 - **Column:** every section lives in `.page-container` (`--page-max: 1600px`, `--page-pad: clamp(1.25rem, 6vw, 6.5rem)`). Only water, video and backgrounds are full-bleed. The left edge of hero copy, nav logo, captions and every section's content is the same line (checked to 1.5 px, gate G14). The one exception is a heading plate that hangs into the margin so the text keeps the edge.
@@ -99,7 +99,7 @@ Raleway only (`--font-sans`), no mono.
 
 - **z-index only through tokens.** The hero scale is `--z-*` in `underwater.css`, the catalog `--cat-z-*` in `categories.css`, page level `--z-sheet`, `--z-modal`, `--z-veil` and `--z-skip` in `globals.css`. A positive number written inline is a bug. `-1` for a backdrop pseudo-element inside an isolated stacking context is fine. Lint: `z-literal`.
 - **Dialog recipe:** `role="dialog" aria-modal="true"` and a label; panel `max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain`; the close button stays reachable while the panel scrolls (sticky); Escape closes; Tab stays inside; focus returns to the opener; a press on the scrim closes. Gate G3 checks the panel fits and the close button is reachable at the end of the content.
-- Nested scroll regions only as a fallback on very short screens (the catalog) and inside dialogs. Never `overscroll-behavior: contain` on the catalog: scroll must chain to the page. The catalog scrolls inside itself on a screen shorter than 34rem and narrower than 640 px (568 x 320, 320 x 480): the eight tiles cannot fit there, the pause button floats over it, and the sweep reports it as a warning, not a failure.
+- Nested scroll regions only inside dialogs. **Nothing in the pinned categories card scrolls on its own:** a touch that begins on an inner scroller is caught by it and the page does not move (measured: 28 to 251 px of overflow on the real phone heights). A screen too short for all eight tiles has the timeline slide the content up by what does not fit, while the card is held open; the pause button floats over the sliding content. Sweep gates G3 and G17 fail on a scroller or a tile that cannot be reached by scrolling the page.
 - Anything that is hidden until a scroll step stays in the tab order and the accessibility tree (opacity, never `visibility` or `display`), takes no pointer input until it is shown, and is brought in by focus (the catalog: `categoriesTimeline.ts`).
 
 ## 9. Motion and fallbacks
@@ -166,8 +166,8 @@ Hidden until scroll   opacity: 0; pointer-events: none; then data-open on the tr
 
 | Command | When | What |
 |---|---|---|
-| `npm run design:lint` | every change | rules `dash emoji raw-color hover-gate vh-unit font-floor z-literal breakpoint mobile-first scroll-listener hand-svg anim-layout important link-unique` |
-| `npm run design:sweep -- --build` | any layout, CSS or markup change | gates G1 to G15 over 27 screens on a production copy at :3150 (never `next build` in the repo: the dev server owns `.next`) |
+| `npm run design:lint` | every change | rules `dash emoji raw-color hover-gate vh-unit font-floor z-literal breakpoint mobile-first scroll-listener hand-svg anim-layout important link-unique contact-placeholder` |
+| `npm run design:sweep -- --build` | any layout, CSS or markup change | gates G1 to G17 over 29 screens on a production copy at :3150 (never `next build` in the repo: the dev server owns `.next`) |
 | `npm run design:sweep -- --only lap-1280,land-568` | while iterating | the same gates on chosen screens against a running copy (`--url`) |
 | Lighthouse mobile and desktop | any visible change | the cached binary in `docs/design/verification.md` |
 | scroll layout-shift run | any scroll-linked change | part of the sweep on the deep screens (G7) |
@@ -192,7 +192,7 @@ Brief-locked or client-required. Restate by id; do not re-litigate.
 | D8 | Raleway only | client |
 | D9 | Hand-drawn SVG: the lure artwork and the swell edge | brief; allowlisted |
 | D10 | The stacked and split hero layout queries (aspect-ratio) | shared with the JS timeline |
-| D11 | The nav is one nav in two states, not a bar on every screen: the hero nav while the hero is pinned, a slim sticky bar (`SiteNavigation`, 64 px, 52 px on short screens) from #story on | a bar over the pinned hero would cost height on short screens, and over the full-screen categories stage it would cover the catalog's header; a reader past those two always has the links |
+| D11 | The nav is one nav in two states, not a bar on every screen: the hero nav while the hero is pinned (four links since Contact was added), a slim sticky bar (`SiteNavigation`, 64 px, 52 px on short screens, five links) from #story on | a bar over the pinned hero would cost height on short screens, and over the full-screen categories stage it would cover the catalog's header; a reader past those two always has the links |
 
 **Open content risk:** the `CATEGORIES` spec claims (casting distance, tensile strength, material percentages, depth ranges) look invented and need client confirmation before launch.
 
