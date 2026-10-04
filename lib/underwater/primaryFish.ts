@@ -20,7 +20,9 @@ import type { Fish } from "./types";
  * step, so a slow scroll, a fast flick, a pause and a scroll back all look
  * like a real fish deciding things (nothing is scrubbed along a rail).
  *
- *   patrol    cruises a wide loop low in the water
+ *   patrol    cruises a slow stadium-shaped track low in the water on its own side of the lure: a swim along
+ *             each straight, a hover at its end (sculling on the current), then a wide turn through the
+ *             camera axis. Its heading is always the way it swims, and it turns at a rate a fish can.
  *   notice    slows and turns its head toward the lure, drifting closer
  *   inspect   hovers at a respectful distance, sculling, with an occasional feint
  *   circle    stalks around the lure on a tilted loop: behind it on the far side, in front on the near side
@@ -82,10 +84,16 @@ interface Vec {
 }
 
 interface Geometry {
-  patrol: { cx: number; cy: number; rx: number; rz: number; ry: number };
+  /**
+   * The patrol track, in lure lengths from the resting hook. `right` is how far right the head ever goes (the
+   * body, which trails it, must stay clear of the lure while the fish has not noticed it), `leftMax` how far
+   * left, `turn` the radius of its turns in BODY lengths, `cy` the height of its water.
+   */
+  patrol: { right: number; leftMax: number; turn: number; cy: number };
   inspect: Vec;
   feint: Vec;
-  orbit: { cx: number; cy: number; rx: number; rz: number };
+  /** The stalking loop around the lure (lure lengths) and its pace in body lengths per second. */
+  orbit: { cx: number; cy: number; rx: number; rz: number; speed: number };
   windup: Vec;
   retreat: Vec;
 }
@@ -94,10 +102,10 @@ interface Geometry {
 // than the lure is long: the fish stalks it from a distance and its body never
 // hides the lure while it hovers.
 const SPLIT: Geometry = {
-  patrol: { cx: -0.6, cy: 0.4, rx: 0.55, rz: 0.3, ry: 0.04 },
+  patrol: { right: -2.2, leftMax: -3.9, turn: 0.34, cy: 0.5 },
   inspect: { x: -1.05, y: 0.12, z: 0.12 },
   feint: { x: -0.78, y: 0.04, z: 0.1 },
-  orbit: { cx: -0.2, cy: 0.02, rx: 0.8, rz: 0.55 },
+  orbit: { cx: -0.2, cy: 0.02, rx: 0.95, rz: 0.7, speed: 0.55 },
   windup: { x: -1.05, y: 0.22, z: -0.1 },
   retreat: { x: -0.95, y: 0.24, z: 0.06 },
 };
@@ -105,16 +113,117 @@ const SPLIT: Geometry = {
 // Phones and portrait screens: the lure fills the width, so everything is
 // tighter, and the strike climbs from below-left at under 30 degrees.
 const STACKED: Geometry = {
-  patrol: { cx: -0.1, cy: 0.7, rx: 0.45, rz: 0.22, ry: 0.04 },
+  patrol: { right: 0.55, leftMax: -1.5, turn: 0.3, cy: 0.8 },
   inspect: { x: -0.68, y: 0.34, z: 0.1 },
   feint: { x: -0.42, y: 0.14, z: 0.1 },
-  orbit: { cx: -0.05, cy: 0.05, rx: 0.6, rz: 0.45 },
+  orbit: { cx: -0.05, cy: 0.05, rx: 0.6, rz: 0.45, speed: 0.4 },
   windup: { x: -0.74, y: 0.36, z: -0.08 },
   retreat: { x: -0.72, y: 0.34, z: 0.05 },
 };
 
 /** Where the mouth closes on the hook, a hair in front of the lure's plane. */
 const HOOK: Vec = { x: 0, y: 0, z: 0.04 };
+
+/**
+ * How fast the head may turn, rad/s. A fish turns no faster than the loop it swims asks for (the heading
+ * follows the swim direction, always), so every loop below is sized to need well under these (scripts/fish-sim.mjs).
+ */
+export const YAW_RATE = { base: 1.7, circle: 2.4, strike: 9, release: 6 } as const;
+
+/** Patrol pace in body lengths per second: a bass cruising, easing round its turns. */
+const PATROL_CRUISE = 0.36;
+const PATROL_TURN = 0.24;
+/** Seconds hovering at the end of a straight (varies with each hover so no two are alike). */
+const PATROL_HOVER = [1.6, 3.0] as const;
+/** Shortest sweep of the head, and shortest straight, in lure lengths. */
+const PATROL_MIN_SWEEP = 1.4;
+const PATROL_MIN_LEG = 0.3;
+
+/** The patrol track: a stadium (two straights joined by two half-circle turns), in lure lengths. */
+interface Track {
+  /** x of the two turn centres. */
+  xa: number;
+  xb: number;
+  /** turn radius, which is also how far the track swings toward and away from the camera */
+  r: number;
+  cy: number;
+  leg: number;
+  arc: number;
+  length: number;
+}
+
+interface Spot {
+  x: number;
+  z: number;
+  /** 0 far straight (heading right), 1 right turn, 2 near straight (heading left), 3 left turn */
+  seg: 0 | 1 | 2 | 3;
+  /** distance along that piece */
+  s: number;
+}
+
+/** `roomLeft` is how many lure lengths lie between the resting hook and the left edge of the screen. */
+function patrolTrack(geo: Geometry["patrol"], fl: number, roomLeft: number): Track {
+  const r = geo.turn * fl;
+  // the fish stays mostly on screen: its tail may leave a little at the left end, not more
+  const left = Math.min(clamp(-roomLeft + 0.5 * fl, geo.leftMax, geo.right), geo.right - PATROL_MIN_SWEEP);
+  const xb = geo.right - r;
+  const xa = Math.min(left + r, xb - PATROL_MIN_LEG);
+  const leg = xb - xa;
+  const arc = Math.PI * r;
+  return { xa, xb, r, cy: geo.cy, leg, arc, length: 2 * (leg + arc) };
+}
+
+/** The point `u` lure lengths along the track (it wraps). */
+function trackSpot(t: Track, u: number, out: Spot): void {
+  let s = ((u % t.length) + t.length) % t.length;
+  if (s < t.leg) {
+    out.seg = 0;
+    out.s = s;
+    out.x = t.xa + s;
+    out.z = -t.r;
+    return;
+  }
+  s -= t.leg;
+  if (s < t.arc) {
+    const a = -Math.PI / 2 + s / t.r;
+    out.seg = 1;
+    out.s = s;
+    out.x = t.xb + t.r * Math.cos(a);
+    out.z = t.r * Math.sin(a);
+    return;
+  }
+  s -= t.arc;
+  if (s < t.leg) {
+    out.seg = 2;
+    out.s = s;
+    out.x = t.xb - s;
+    out.z = t.r;
+    return;
+  }
+  s -= t.leg;
+  const a = Math.PI / 2 + s / t.r;
+  out.seg = 3;
+  out.s = s;
+  out.x = t.xa + t.r * Math.cos(a);
+  out.z = t.r * Math.sin(a);
+}
+
+/** Where along the track a fish at (x, z) should rejoin it: the nearest point. */
+function nearestOnTrack(t: Track, x: number, z: number, spot: Spot): number {
+  let best = 0;
+  let bestD = Infinity;
+  const steps = 96;
+  for (let i = 0; i < steps; i++) {
+    const u = (i / steps) * t.length;
+    trackSpot(t, u, spot);
+    const d = (spot.x - x) ** 2 + (spot.z - z) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = u;
+    }
+  }
+  return best;
+}
 
 const STRIKE_SECONDS = 0.4;
 const RELEASE_SECONDS = 0.55;
@@ -135,6 +244,8 @@ const HOOKED_HEADING = -0.22;
 const SHAKE = 0.24;
 const RUN = 0.55;
 const SWING_LIMIT = 0.38;
+
+const spot: Spot = { x: 0, z: 0, seg: 0, s: 0 };
 
 export interface PrimaryBrain {
   mode: PrimaryMode;
@@ -160,7 +271,11 @@ export interface PrimaryBrain {
   vy: number;
   vz: number;
 
-  patrolPhase: number;
+  /** Where the patrol's carrot is along the track (lure lengths), how fast it moves, and the hover time left. */
+  patrolU: number;
+  patrolSpeed: number;
+  patrolHold: number;
+  hovers: number;
   orbitAngle: number;
   feintClock: number;
   strikeFrom: Vec;
@@ -190,13 +305,16 @@ export function createPrimaryBrain(): PrimaryBrain {
     entered: false,
     dash: false,
     frame: 0,
-    px: SPLIT.patrol.cx,
+    px: SPLIT.patrol.leftMax,
     py: SPLIT.patrol.cy,
     pz: 0,
     vx: 0,
     vy: 0,
     vz: 0,
-    patrolPhase: 0,
+    patrolU: 0,
+    patrolSpeed: 0,
+    patrolHold: 0,
+    hovers: 0,
     orbitAngle: Math.PI,
     feintClock: 2.4,
     strikeFrom: { x: 0, y: 0, z: 0 },
@@ -313,7 +431,7 @@ export function updatePrimary(
   if (!b.entered) {
     b.entered = true;
     const edge = -(anchorOf(ctx, 0).x / Math.max(lure.length, 1)) - fl - 0.3;
-    b.px = Math.min(geo.patrol.cx - geo.patrol.rx - 0.2, edge);
+    b.px = Math.min(geo.patrol.leftMax - 0.5, edge);
     b.py = geo.patrol.cy;
     b.pz = 0;
     b.vx = b.vy = b.vz = 0;
@@ -375,17 +493,41 @@ export function updatePrimary(
 
   switch (b.mode) {
     case "patrol": {
-      const p = geo.patrol;
+      const track = patrolTrack(geo.patrol, fl, anchorOf(ctx, 0).x / Math.max(lure.length, 1));
       if (b.entering) {
-        b.patrolPhase = Math.atan2(b.pz / p.rz, (b.px - p.cx) / p.rx);
+        b.patrolU = nearestOnTrack(track, b.px, b.pz, spot);
+        b.patrolSpeed = 0;
+        b.patrolHold = 0;
         b.entering = false;
       }
-      const speed = 0.5 * fl; // 0.5 body lengths per second
-      b.patrolPhase += (speed / Math.sqrt((p.rx * p.rx + p.rz * p.rz) / 2)) * dt;
+      // A carrot runs round the track and the fish follows it on a spring: along each straight at a cruise
+      // that eases off toward the end, a hover there, then round the turn slowly, so the way it faces is
+      // always the way it goes (the heading rate it needs stays under YAW_RATE).
+      trackSpot(track, b.patrolU, spot);
+      let goal = 0;
+      if (b.patrolHold > 0) {
+        b.patrolHold -= dt;
+      } else if (spot.seg === 0 || spot.seg === 2) {
+        const remaining = track.leg - spot.s;
+        const surge = 1 + 0.06 * Math.sin(time * 0.37 + 1.3);
+        goal = PATROL_CRUISE * fl * clamp(remaining / (0.5 * fl), 0.12, 1) * surge;
+        if (remaining < 0.03) {
+          // the end of the straight: hover, then take the turn
+          b.patrolHold = lerp(PATROL_HOVER[0], PATROL_HOVER[1], 0.5 + 0.5 * Math.sin(2.4 * b.hovers + 0.7));
+          b.hovers++;
+          b.patrolU += 0.05;
+          goal = 0;
+        }
+      } else {
+        goal = PATROL_TURN * fl;
+      }
+      b.patrolSpeed = damp(b.patrolSpeed, goal, 1.4, dt);
+      b.patrolU += b.patrolSpeed * dt;
+      trackSpot(track, b.patrolU, spot);
       const target = {
-        x: p.cx + p.rx * Math.cos(b.patrolPhase),
-        y: p.cy + p.ry * Math.sin(2 * b.patrolPhase) + 0.02 * wobble(time * 0.5, 1.3),
-        z: p.rz * Math.sin(b.patrolPhase),
+        x: spot.x + 0.02 * wobble(time * 0.5, 2.1),
+        y: track.cy + 0.03 * wobble(time * 0.4, 1.3),
+        z: spot.z,
       };
       seek(b, target, 3, 1.1 * fl, dt);
       state = "idle";
@@ -428,8 +570,12 @@ export function updatePrimary(
       // keep the loop on screen when the lure sits close to an edge
       const roomRight = (world.width - lure.hookX) / Math.max(lure.length, 1) - 0.1;
       const rx = Math.min(o.rx, Math.max(0.3, roomRight - o.cx));
-      const speed = 0.62 * fl * hurrySpeed;
-      b.orbitAngle += (speed / Math.sqrt((rx * rx + o.rz * o.rz) / 2)) * dt;
+      // The heading of a fish on an ellipse turns fastest at the ends of its long axis. Slow the loop (never
+      // speed it up) so that peak stays at 70% of what the head can turn, on a cramped screen too.
+      const meanRadius = Math.sqrt((rx * rx + o.rz * o.rz) / 2);
+      const squash = Math.max(rx / o.rz, o.rz / rx);
+      const speed = Math.min(o.speed * fl, (0.7 * YAW_RATE.circle * meanRadius) / squash) * hurrySpeed;
+      b.orbitAngle += (speed / meanRadius) * dt;
       const target = {
         x: o.cx + rx * Math.cos(b.orbitAngle),
         y: o.cy + 0.04 * Math.sin(2 * b.orbitAngle),
@@ -516,8 +662,15 @@ export function updatePrimary(
     const towardLure = b.px <= 0 ? 0 : Math.PI;
     const alongPath = Math.atan2(b.vz, b.vx);
     const w = smoothstep(0.03, 0.12, horizontal / fl);
-    const yawTarget = towardLure + angleDiff(towardLure, alongPath) * w;
-    const yawRate = b.mode === "strike" ? 9 : b.mode === "release" ? 6 : 1.7 * hurrySpeed;
+    // on patrol it has not noticed the lure: hovering, it keeps its heading rather than pivoting to face it
+    const rest = b.mode === "patrol" && fish.placed ? fish.yaw : towardLure;
+    const yawTarget = rest + angleDiff(rest, alongPath) * w;
+    const yawRate =
+      b.mode === "strike"
+        ? YAW_RATE.strike
+        : b.mode === "release"
+          ? YAW_RATE.release
+          : (b.mode === "circle" ? YAW_RATE.circle : YAW_RATE.base) * hurrySpeed;
     fish.yaw = fish.placed ? turnToward(fish.yaw, yawTarget, yawRate * dt) : yawTarget;
 
     const pitchTarget = clamp(
