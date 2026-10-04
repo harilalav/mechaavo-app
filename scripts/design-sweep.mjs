@@ -6,7 +6,7 @@
  * laptops, desktops, ultrawide) and measures what source code cannot tell: overflow,
  * nav height, whether the hero fits, tap targets, text sizes, clipped text, layout
  * shift, keyboard order, fallbacks. The rules it enforces are in
- * docs/DESIGN-GUIDELINES.md; every gate id (G1..G15) is explained in
+ * docs/DESIGN-GUIDELINES.md; every gate id (G1..G17) is explained in
  * docs/design/verification.md.
  *
  *   npm run design:sweep -- --build            build a production copy on :3150, sweep it, stop it
@@ -39,6 +39,8 @@ const SCREENS = [
   { id: "phone-se", w: 320, h: 480, dpr: 2, touch: true },
   { id: "phone-360", w: 360, h: 640, dpr: 3, touch: true },
   { id: "phone-375", w: 375, h: 600, dpr: 3, touch: true },
+  { id: "phone-360s", w: 360, h: 560, dpr: 3, touch: true },
+  { id: "phone-375s", w: 375, h: 548, dpr: 3, touch: true },
   { id: "phone-390", w: 390, h: 664, dpr: 3, touch: true, deep: true },
   { id: "phone-412", w: 412, h: 760, dpr: 2.625, touch: true },
   { id: "phone-430", w: 430, h: 740, dpr: 3, touch: true },
@@ -80,6 +82,8 @@ const GATES = {
   G13: "eyebrow budget ceil(sections / 3)",
   G14: "left edges on the column edge",
   G15: "media: sized, alt, poster and pause, canvases inert",
+  G16: "scroll budget: bite to lift, bite to the categories, categories to the catalog",
+  G17: "catalog: no scroller inside the card, every tile reachable by scrolling the page",
 };
 
 /** Thresholds. Mirrors docs/DESIGN-GUIDELINES.md (sections 6 and 7); change both together. */
@@ -96,9 +100,17 @@ const T = {
   clsFail: 0.01,
   alignTolPx: 1.5,
   shortPx: 544, // 34rem
+  /* G16, in screens (viewport heights) of scroll, for a steady gesture of an eighth of a screen every 250 ms */
+  biteWindow: [0.55, 1.15], // where the approved bite lands (0.88 on 1440x800, 0.75 on 390x664 before the budget)
+  liftMax: 0.4, // from the bite until the lure is visibly drawn up
+  biteToSheetMax: 2.4, // from the bite until the categories sheet reaches the top
+  sheetToCatalogMax: 0.75, // from the sheet at the top until the catalog is fully in
+  liftLengths: 0.6, // "visibly drawn up": the lure has moved this many of its own lengths
 };
 
 const STATES_JS = ["top", "caught", "catalog", "modal", "story", "principles", "commitment"];
+/** G16 runs on its own fresh page (the fish must not have bitten yet), on the deep screens; it is a state of its own. */
+const STATE_BUDGET = "budget";
 const STATES_STATIC = ["top", "catalog", "story", "principles", "commitment"];
 
 /* ------------------------------------------------------------------------------------------ */
@@ -841,6 +853,90 @@ async function clsRun(page, vh) {
   return page.evaluate(() => window.__cls ?? { value: 0, shifts: [] });
 }
 
+/**
+ * G16: how much scroll lies between the beats after the bite, measured in screens. One steady gesture
+ * (an eighth of a screen every 250 ms) finds the bite (the page's own data-caught); from there the page is
+ * scrolled and let settle, so the scrub's lag does not count, until the lure is visibly drawn up, the
+ * categories sheet is at the top, and the catalog is fully in.
+ */
+async function budgetRun(page) {
+  const g = await geometry(page);
+  const vh = g.vh;
+  const step = Math.max(24, Math.round(vh * 0.125));
+  const tie = () =>
+    page.evaluate(() => {
+      const at = (n) => document.querySelector(`[data-hero-anchor="${n}"]`)?.getBoundingClientRect();
+      const a = at("tie");
+      const b = at("tail");
+      return a && b ? { x: a.left + a.width / 2, y: a.top + a.height / 2, len: Math.hypot(a.left - b.left, a.top - b.top) } : null;
+    });
+  const caught = () => page.evaluate(() => !!document.querySelector(".hero-root[data-caught]"));
+  const catalogIn = () =>
+    page.evaluate(() => {
+      const c = document.querySelector(".cat-catalog");
+      return c ? Number(getComputedStyle(c).opacity) >= 0.98 : false;
+    });
+
+  const out = { vh, biteY: null, liftY: null, sheetY: g.catTop, catalogY: null };
+  let y = 0;
+  await scrollTo(page, 0, 700);
+  // 1. a steady gesture down until the fish takes the lure
+  while (y < g.catTop && out.biteY === null) {
+    y = Math.min(y + step, g.catTop);
+    await scrollTo(page, y, 250);
+    if (await caught()) out.biteY = y;
+  }
+  if (out.biteY === null) return out;
+  // 2. from the bite: stop and look at every step, until the lure has been drawn up
+  await wait(page, 900);
+  const base = await tie();
+  while (y < g.catTop && out.liftY === null) {
+    y = Math.min(y + step, g.catTop);
+    await scrollTo(page, y, 900);
+    const now = await tie();
+    if (base && now && Math.hypot(now.x - base.x, now.y - base.y) >= T.liftLengths * base.len) out.liftY = y;
+  }
+  // 3. the categories sheet at the top, then the catalog opening
+  await scrollTo(page, g.catTop, 1200);
+  y = g.catTop;
+  const end = g.catTop + Math.max(0, g.catH - vh);
+  while (y < end && out.catalogY === null) {
+    y = Math.min(y + step, end);
+    await scrollTo(page, y, 1100);
+    if (await catalogIn()) out.catalogY = y;
+  }
+  return out;
+}
+
+function judgeBudget(r) {
+  const problems = [];
+  const screens = (px) => (px / r.vh).toFixed(2);
+  if (r.biteY === null) return ["the fish never took the lure before the categories sheet reached the top"];
+  const bite = r.biteY / r.vh;
+  if (bite < T.biteWindow[0] || bite > T.biteWindow[1]) problems.push(`the bite lands ${bite.toFixed(2)} screens down (the approved bite is ${T.biteWindow[0]} to ${T.biteWindow[1]})`);
+  if (r.liftY === null) problems.push("the lure is never drawn up before the categories sheet reaches the top");
+  else if ((r.liftY - r.biteY) / r.vh > T.liftMax) problems.push(`${screens(r.liftY - r.biteY)} screens from the bite until the lure is drawn up (at most ${T.liftMax})`);
+  if ((r.sheetY - r.biteY) / r.vh > T.biteToSheetMax) problems.push(`${screens(r.sheetY - r.biteY)} screens from the bite until the categories sheet is at the top (at most ${T.biteToSheetMax})`);
+  if (r.catalogY === null) problems.push("the catalog is not fully in at the end of its card");
+  else if ((r.catalogY - r.sheetY) / r.vh > T.sheetToCatalogMax) problems.push(`${screens(r.catalogY - r.sheetY)} screens from the sheet at the top until the catalog is fully in (at most ${T.sheetToCatalogMax})`);
+  return problems;
+}
+
+/** G17: is the catalog a scroller of its own, and can the last tile be brought into view by scrolling the page? */
+const catalogReach = () => {
+  const cat = document.querySelector(".cat-catalog");
+  const tiles = [...document.querySelectorAll(".cat-card")];
+  if (!cat || !tiles.length) return null;
+  const overflow = cat.scrollHeight - cat.clientHeight;
+  const last = tiles[tiles.length - 1].getBoundingClientRect();
+  return {
+    scroller: /auto|scroll/.test(getComputedStyle(cat).overflowY) && overflow > 1,
+    overflow,
+    lastBottom: Math.round(last.bottom),
+    vh: window.innerHeight,
+  };
+};
+
 function ctxOptions(screen, extra = {}) {
   return {
     viewport: { width: screen.w, height: screen.h },
@@ -888,6 +984,17 @@ async function runScreen(browser, screen, o, results) {
       }
       for (const r of judge(data, { screen, state })) record("js", state, r.gate, r.problems.map((p) => (note.forced ? `[forced data-caught] ${p}` : p)), r.warns);
       await shot(page, state);
+      if (state === "catalog") {
+        // G17: at the end of the card's hold the last tile must be on screen, and nothing inside the card scrolls
+        const g = await geometry(page);
+        await scrollTo(page, g.catTop + Math.max(0, g.catH - g.vh) * 0.97, 2400);
+        const reach = await page.evaluate(catalogReach);
+        const problems = [];
+        if (reach?.scroller) problems.push(`the catalog scrolls inside the card (${reach.overflow}px of overflow): a touch that starts on it does not move the page`);
+        if (reach && reach.lastBottom > reach.vh + 1) problems.push(`the last tile ends at ${reach.lastBottom}px on a ${reach.vh}px screen at the end of the card`);
+        record("js", state, "G17", problems);
+        await enter(page, "catalog", "js");
+      }
       if (state === "modal") {
         await page.keyboard.press("Escape").catch(() => {});
         await wait(page, 400);
@@ -902,6 +1009,16 @@ async function runScreen(browser, screen, o, results) {
       record("js", "scroll", "G7", v > T.clsFail ? [`layout shift ${v} while scrolling the page: ${cls.shifts.slice(0, 5).map((s) => `${s.value} ${s.sources.join("/")}`).join("; ")}`] : [], v > 0 && v <= T.clsFail ? [`layout shift ${v} while scrolling`] : []);
     }
     record("js", "all", "G10", [...new Set(ev.errors)].slice(0, 5).concat([...new Set(ev.failed)].slice(0, 5)));
+    await ctx.close();
+  }
+
+  /* ---- G16: the scroll budget, on a page the fish has not yet bitten on */
+  if (screen.deep && o.states.includes(STATE_BUDGET)) {
+    const ctx = await browser.newContext(ctxOptions(screen));
+    const page = await ctx.newPage();
+    await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
+    await readyHero(page, true);
+    record("js", "budget", "G16", judgeBudget(await budgetRun(page)));
     await ctx.close();
   }
 
@@ -1024,14 +1141,14 @@ async function main() {
   const val = (n) => (args.includes(n) ? args[args.indexOf(n) + 1] : null);
 
   if (flag("--help") || flag("-h")) {
-    console.log(`design:sweep  browser sweep of the built site (gates G1 to G15, see docs/design/verification.md)
+    console.log(`design:sweep  browser sweep of the built site (gates G1 to G17, see docs/design/verification.md)
 
   --build            build a production copy (scripts/preview-clone.sh), sweep it, stop it
   --port <n>         port for --build (default 3150); use another when a different session holds it
   --url <url>        sweep a copy that is already running (default http://localhost:<port>)
   --only a,b         screens to run, by id or WxH (ids: ${SCREENS.map((x) => x.id).join(" ")})
   --quick            only the deep screens
-  --states a,b       ${STATES_JS.join(" ")}
+  --states a,b       ${[...STATES_JS, STATE_BUDGET].join(" ")}
   --shots <dir>      save screenshots (top, caught, catalog, modal)
   --json <file>      write every result
   --keep             leave the --build server running`);
@@ -1062,7 +1179,7 @@ async function main() {
   if (flag("--quick")) screens = screens.filter((s) => s.deep);
   const only = val("--only")?.split(",");
   if (only) screens = SCREENS.filter((s) => only.includes(s.id) || only.includes(`${s.w}x${s.h}`));
-  const states = val("--states")?.split(",") ?? STATES_JS;
+  const states = val("--states")?.split(",") ?? [...STATES_JS, STATE_BUDGET];
   const allow = loadSweepAllowlist();
 
   const launch = () => chromium.launch({ executablePath: chrome, headless: true, args: ["--disable-dev-shm-usage"] });
