@@ -25,6 +25,17 @@
  * 0.25 over the page), which the lab never sees because it never scrolls. All the
  * sizes stay calc()s of clamp / vw / svh: nothing is measured, nothing needs a
  * refresh when the window resizes.
+ *
+ * Two viewport heights. A phone browser's toolbars show and hide as the page scrolls, so the
+ * viewport is between 100svh (toolbars out) and 100lvh (toolbars away). The content lays out against
+ * the small one (a pinned stage that jumped with the toolbars would be worse), but the stage itself
+ * is as tall as the large one and only the water, the card's window and its shadow paint to that
+ * height: a stage of exactly 100svh left a strip of white page showing below it whenever the toolbars
+ * were away, which flickered in and out as they came back on the small reverse movement that ends a
+ * flick. The catalog, the white card and the pause button sit in .cat-view, which is 100svh tall.
+ * Nothing in the card scrolls on its own either (a touch that started on the catalog was caught by
+ * it and the page did not move): a screen too short for all eight tiles has the timeline slide the
+ * content up by what does not fit, while the card is held open.
  */
 
 @property --open {
@@ -79,6 +90,11 @@
 /* the card's shadow exists only in the scrolling layout (below) */
 .cat-shadow {
   display: none;
+}
+
+/* the card's content: no box of its own in the plain layout, a 100svh one in the scrolling layout (below) */
+.cat-view {
+  display: contents;
 }
 
 /* — the water — */
@@ -201,11 +217,16 @@
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .cat-catalog {
+  .cat-catalog,
+  .cat-glass {
     background-color: color-mix(in srgb, var(--page) 94%, transparent);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+/* the glass as a layer of its own exists only in the scrolling layout (below): in the plain one the catalog carries it */
+.cat-glass {
+  display: none;
 }
 
 /*
@@ -481,7 +502,17 @@
     position: sticky;
     top: 0;
     height: 100svh;
+    /* paints to the large viewport: see the header. Where lvh is unknown the line above stays. */
+    height: 100lvh;
     overflow: hidden;
+  }
+
+  /* the content is laid out against the small viewport, from the top of the stage */
+  .cat-track:not([data-static]) .cat-view {
+    position: absolute;
+    inset: 0 0 auto;
+    display: block;
+    height: 100svh;
   }
 
   /*
@@ -495,8 +526,15 @@
     position: absolute;
     inset: 0;
     min-height: 0;
+    /*
+     * The closed card is centred in the small viewport (the top inset), the bottom inset is whatever
+     * is left of the frame, which is as tall as the large one: at --open 1 every inset is 0 and the
+     * water fills it all, under the toolbars when they are away.
+     */
     clip-path: inset(
-      calc((100% - var(--card-h)) / 2 * (1 - var(--open)))
+      calc((100svh - var(--card-h)) / 2 * (1 - var(--open)))
+      calc((100% - var(--card-w)) / 2 * (1 - var(--open)))
+      calc((100% - var(--card-h) - (100svh - var(--card-h)) / 2) * (1 - var(--open)))
       calc((100% - var(--card-w)) / 2 * (1 - var(--open)))
       round calc(var(--card-r) * (1 - var(--open)))
     );
@@ -506,11 +544,11 @@
   .cat-track:not([data-static]) .cat-shadow {
     --open: 0;
     position: absolute;
-    inset: 0;
+    inset: calc((100svh - var(--card-h)) / 2) 0 auto;
     display: block;
     width: var(--card-w);
     height: var(--card-h);
-    margin: auto;
+    margin: 0 auto;
     border-radius: var(--card-r);
     pointer-events: none;
     opacity: max(0, calc(1 - var(--open) * 5));
@@ -529,6 +567,8 @@
   .cat-track:not([data-static]) .cat-media {
     --open: 0;
     --s0: max(tan(atan2(var(--card-w), 100cqw)), tan(atan2(var(--card-h), 100svh)));
+    /* the middle of the small viewport, where the closed card sits (the water itself is as tall as the large one) */
+    transform-origin: 50% 50svh;
     transform: scale(calc(var(--s0) + (1 - var(--s0)) * var(--open)));
   }
 
@@ -548,12 +588,36 @@
    * is open (the timeline sets data-open), so the closed card's water is not a
    * hidden button.
    */
+  .cat-track:not([data-static]) .cat-glass {
+    position: absolute;
+    inset: 0;
+    z-index: var(--cat-z-catalog);
+    display: block;
+    pointer-events: none;
+    opacity: 0;
+    background-color: color-mix(in srgb, var(--page) 50%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+  /* (the same rule as the reduced-transparency one above, which a layer of equal specificity would lose to this) */
+  @media (prefers-reduced-transparency: reduce) {
+    .cat-track:not([data-static]) .cat-glass {
+      background-color: color-mix(in srgb, var(--page) 94%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
   .cat-track:not([data-static]) .cat-catalog {
     position: absolute;
     inset: 0;
     min-height: 0;
+    /* its glass is the layer behind it (.cat-glass) */
+    background-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     padding-block: clamp(1.25rem, 3vw, 2.5rem) 4rem;
-    overflow-y: auto;
+    /* no overflow-y: nothing in the card scrolls on its own (the timeline slides the content up, see the header) */
     opacity: 0;
     pointer-events: none;
   }
@@ -635,7 +699,8 @@
 /* and in the scrolling layout the catalog's own padding gives up some height too (the pause button still clears the grid at the end) */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-height: 34rem) {
   .cat-track:not([data-static]) .cat-catalog {
-    padding-block: 0.75rem 3.25rem;
+    /* the pause button is 2.75rem tall and 1rem off the bottom: the last row ends above it once the content has slid up */
+    padding-block: 0.75rem 3.75rem;
   }
 }
 

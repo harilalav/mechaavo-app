@@ -244,7 +244,8 @@ const probe = (cfg) => {
       caught: !!q(".hero-root[data-caught]"),
     };
     const cat = q(".cat-catalog");
-    out.catalog = cat && isVisible(cat) ? { scrolls: cat.scrollHeight > cat.clientHeight + 2, clientH: cat.clientHeight, scrollH: cat.scrollHeight } : null;
+    // a scroller of its own (overflow auto or scroll): the card's content may overflow, the timeline slides it (G17 checks it can be reached)
+    out.catalog = cat && isVisible(cat) ? { scrolls: /auto|scroll/.test(getComputedStyle(cat).overflowY) && cat.scrollHeight > cat.clientHeight + 2, clientH: cat.clientHeight, scrollH: cat.scrollHeight } : null;
     const panel = q(".cat-modal__panel");
     if (panel) {
       const pr = panel.getBoundingClientRect();
@@ -274,7 +275,8 @@ const probe = (cfg) => {
     const scrollParentOf = (el) => {
       for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
         const oy = getComputedStyle(p).overflowY;
-        if (oy === "auto" || oy === "scroll") {
+        // the catalog's content slides under the pause button as the page scrolls (nothing in the card scrolls by itself)
+        if (oy === "auto" || oy === "scroll" || p.classList.contains("cat-catalog")) {
           if (!scrollIds.has(p)) scrollIds.set(p, scrollIds.size + 1);
           return scrollIds.get(p);
         }
@@ -570,9 +572,7 @@ function judge(d, c) {
     if (d.nav && overlap(r, d.nav.r) > 12) fit.push("statement overlaps the nav");
   }
   if (state === "catalog" && d.catalog?.scrolls) {
-    const msg = `catalog scrolls inside itself (${d.catalog.scrollH}px of content in ${d.catalog.clientH}px)`;
-    if (d.vh >= T.shortPx) fit.push(msg);
-    else fitWarn.push(msg + ", the short-screen fallback");
+    fit.push(`catalog scrolls inside itself (${d.catalog.scrollH}px of content in ${d.catalog.clientH}px): a touch that starts on it does not move the page`);
   }
   if (state === "modal") {
     if (!d.modal) fit.push("dialog did not open");

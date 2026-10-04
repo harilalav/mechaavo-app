@@ -1,6 +1,7 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SECTION_IDS } from "../config/sections";
+import { scrubSeconds } from "./scrub";
 import { LURE_ZOOM_GAIN } from "../hero/lureConfig";
 import { resetHeroScene, STORY, type HeroScene } from "../underwater/story";
 
@@ -151,7 +152,7 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
       trigger: track,
       start: "top top",
       end: () => `+=${storyDistance()}`,
-      scrub: 1,
+      scrub: scrubSeconds(),
       invalidateOnRefresh: true,
     },
   });
