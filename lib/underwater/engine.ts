@@ -418,7 +418,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     // Scroll asks for the hooked fish to be drawn up out of the water; it only is once the fish has
     // fought for a moment (so a fast scroll still shows the bite and the fight first), and it eases
     // toward the asked-for place rather than jumping there.
-    const reelGate = hooked ? smoothstep(1.2, 2.8, brain.hookedTime) : 0;
+    const reelGate = hooked ? smoothstep(0.9, 2.2, brain.hookedTime) : 0;
     const reelTarget = scene.reel * reelGate;
     reelShown = damp(reelShown, reelTarget, reelTarget > reelShown ? 2.6 : 3.4, dt);
     simContext.reel = reelShown;

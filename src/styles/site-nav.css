@@ -138,6 +138,13 @@
     min-height: 0;
     margin: -0.7em -0.9em;
     padding: 0.7em 0.9em;
+    /* five links and the logo on a 768px bar: tracked tighter until there is room (lg, below) */
+    letter-spacing: 0.14em;
+  }
+}
+@media (min-width: 1024px) {
+  .site-nav__link {
+    letter-spacing: 0.2em;
   }
 }
 /* a touch screen at nav width (a tablet): 44px targets, 8px apart, by the same trick */
@@ -153,7 +160,8 @@
   .site-nav__inner {
     min-height: 3.25rem;
   }
+  /* 44px tall (the logo link is a touch target): the lockup is 910 x 467 */
   .site-nav__logo {
-    width: 4.75rem;
+    width: 5.4rem;
   }
 }

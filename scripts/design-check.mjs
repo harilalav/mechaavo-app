@@ -649,6 +649,21 @@ rule({
 });
 
 rule({
+  id: "contact-placeholder",
+  level: "warn",
+  exts: [],
+  repo: true,
+  describe: "Warns while lib/config/contact.ts says CONTACT_IS_PLACEHOLDER = true: the contact details are stand-ins and the site must not ship with them (`--strict` makes it fail).",
+  run(_file, ctx) {
+    const file = ctx.files.find((f) => f.path.replace(/\\/g, "/").endsWith("lib/config/contact.ts"));
+    if (!file) return [];
+    const m = /CONTACT_IS_PLACEHOLDER\s*(?::\s*boolean\s*)?=\s*true/.exec(file.clean);
+    if (!m) return [];
+    return [{ line: file.clean.slice(0, m.index).split("\n").length, path: "lib/config/contact.ts", message: "the contact details are placeholders: put the brand's real ones in lib/config/contact.ts and set CONTACT_IS_PLACEHOLDER to false before launch" }];
+  },
+});
+
+rule({
   id: "eyebrow-count",
   level: "info",
   exts: [],

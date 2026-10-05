@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowRightIcon,
@@ -9,7 +10,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { Mark, Tide } from "@/components/ui/Tide";
-import { CATEGORIES_VIDEO } from "@/lib/config/media";
+import { CATEGORIES_VIDEO, CATEGORY_MEDIA } from "@/lib/config/media";
 import { SECTION_IDS } from "@/lib/config/sections";
 import { useLoopingVideo } from "@/lib/hooks/useLoopingVideo";
 import { whenIdle } from "@/lib/utils/idle";
@@ -424,111 +425,135 @@ export function ProductCategories() {
         <div className="cat-frame" data-cat="frame">
           <CategoryWater panelRef={panelRef} videoRef={videoRef} posterWanted={posterWanted} />
 
-          {/* Full catalog: frosted glass over the water, unseen until the card has opened */}
-          <div className="cat-catalog" data-cat="catalog">
-            <div className="page-container cat-catalog__inner" data-cat="catalog-inner">
-              {/* Top bar of the catalog: the headline, with its explainer stacked under it (roomy screens only) */}
-              <div className="mb-4 border-b border-line pb-4 md:mb-6 md:pb-6">
-                {/* manual: it starts when the card has opened (categoriesTimeline), not when the page scrolls */}
+          {/* The frosted glass over the water, a layer of its own so it can be as tall as the card's frame (the catalog's content is laid out against the small viewport, see .cat-view); unseen until the card has opened */}
+          <div className="cat-glass" data-cat="glass" aria-hidden="true" />
+
+          {/* The card's content (catalog, white preview, pause button) lays out against the small viewport, the water around it paints to the large one: see .cat-view in categories.css */}
+          <div className="cat-view">
+            {/* Full catalog: frosted glass over the water, unseen until the card has opened */}
+            <div className="cat-catalog" data-cat="catalog">
+              <div className="page-container cat-catalog__inner" data-cat="catalog-inner">
+                {/* On a screen too short for all eight tiles the timeline slides this up by what does not fit, while the card is held open (nothing in the card scrolls on its own) */}
+                <div className="cat-catalog__slide" data-cat="catalog-slide">
+                  {/* Top bar of the catalog: the headline, with its explainer stacked under it (roomy screens only) */}
+                  <div className="mb-4 border-b border-line pb-4 md:mb-6 md:pb-6">
+                    {/* manual: it starts when the card has opened (categoriesTimeline), not when the page scrolls */}
+                    <Tide
+                      as="h2"
+                      id={TITLE_ID}
+                      className="cat-catalog__title display-type text-ink"
+                      text="Tackle [Architecture]."
+                      drop
+                      manual
+                    />
+                    <p className="cat-catalog__lede mt-3 max-w-prose text-base text-ink-soft">
+                      Engineered lure and terminal systems designed for maximum hydrodynamics,
+                      uncompromising hook-up conversion, and predatory triggers.
+                    </p>
+                  </div>
+
+                  {/* 8 Category Bento Grid: the tiles tighten on a small or short screen (categories.css) so all eight stay in one screen */}
+                  <div className="cat-grid">
+                    {CATEGORIES.map((cat, idx) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={(event) => {
+                          openerRef.current = event.currentTarget;
+                          setSelectedCategory(cat);
+                        }}
+                        className="cat-card group relative overflow-hidden rounded-2xl border border-line text-left focus-visible:outline-2 focus-visible:outline-ink"
+                      >
+                        {/* The photo (decoration: the button is named by the category's name), with the index on it; src/styles/categories.css grades it with the tokens */}
+                        <span className="cat-card__photo" aria-hidden="true">
+                          {/* fetched once the card is close, like the poster: on a slow connection they would otherwise compete with the font and the first paint (they added 0.4 s to the mobile LCP) */}
+                          {posterWanted && CATEGORY_MEDIA[cat.id] && (
+                            <Image
+                              src={CATEGORY_MEDIA[cat.id].src}
+                              alt=""
+                              fill
+                              sizes="(min-width: 1024px) 24vw, (min-width: 768px) 22vw, 46vw"
+                              quality={70}
+                              className="cat-card__img"
+                            />
+                          )}
+                          <span className="cat-card__index tabular-nums">0{idx + 1}</span>
+                        </span>
+
+                        {/* Tag (roomy screens only) */}
+                        <div className="cat-card__roomy flex items-center text-xs text-ink-muted">
+                          <span className="rounded-md border border-line/60 bg-page px-2 py-0.5 text-xs font-medium tracking-wide">
+                            {cat.tag}
+                          </span>
+                        </div>
+
+                        {/* Title & Preview */}
+                        <div>
+                          <h3 className="cat-card__name display-type text-ink">
+                            <TileName name={cat.name} />
+                          </h3>
+                          <p className="cat-card__more mt-2 line-clamp-2 text-sm leading-relaxed text-ink-soft">
+                            {cat.subtitle}
+                          </p>
+                        </div>
+
+                        {/* Subcategories tags & action */}
+                        <div className="cat-card__foot">
+                          <div className="cat-card__roomy flex flex-wrap gap-1.5">
+                            {cat.subcategories.slice(0, 2).map((sub) => (
+                              <span
+                                key={sub}
+                                className="rounded bg-page px-2 py-0.5 text-xs text-ink-muted"
+                              >
+                                {sub}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs font-bold tracking-wider text-ink uppercase">
+                            <span>Inspect Specs</span>
+                            <ArrowRightIcon
+                              size={14}
+                              weight="bold"
+                              aria-hidden="true"
+                              className="text-accent transition-transform duration-300 group-hover:translate-x-1"
+                            />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* The white card on the water: shrinks away as the card opens */}
+            <div className="cat-preview" data-cat="preview">
+              <p className="cat-preview__badge">
+                <span className="cat-preview__dot" aria-hidden="true" />
+                System 02 // Products
+              </p>
+
+              <div>
                 <Tide
-                  as="h2"
-                  id={TITLE_ID}
-                  className="cat-catalog__title display-type text-ink"
-                  text="Tackle [Architecture]."
+                  as="p"
+                  className="cat-preview__title display-type"
+                  text="Engineered|Tackle|[Categories]."
                   drop
-                  manual
                 />
-                <p className="cat-catalog__lede mt-3 max-w-prose text-base text-ink-soft">
-                  Engineered lure and terminal systems designed for maximum hydrodynamics,
-                  uncompromising hook-up conversion, and predatory triggers.
+                <p className="cat-preview__sub">
+                  Scroll to expand the complete 8-system architecture
                 </p>
               </div>
 
-              {/* 8 Category Bento Grid: the tiles tighten on a small or short screen (categories.css) so all eight stay in one screen */}
-              <div className="cat-grid">
-                {CATEGORIES.map((cat, idx) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={(event) => {
-                      openerRef.current = event.currentTarget;
-                      setSelectedCategory(cat);
-                    }}
-                    className="cat-card group relative overflow-hidden rounded-2xl border border-line text-left focus-visible:outline-2 focus-visible:outline-ink"
-                  >
-                    {/* Index & Tag */}
-                    <div className="flex items-center justify-between text-xs text-ink-muted">
-                      <span className="font-bold tracking-wider tabular-nums">0{idx + 1}</span>
-                      <span className="cat-card__more rounded-md border border-line/60 bg-page px-2 py-0.5 text-xs font-medium tracking-wide">
-                        {cat.tag}
-                      </span>
-                    </div>
-
-                    {/* Title & Preview */}
-                    <div>
-                      <h3 className="cat-card__name display-type text-ink">
-                        <TileName name={cat.name} />
-                      </h3>
-                      <p className="cat-card__more mt-2 line-clamp-2 text-sm leading-relaxed text-ink-soft">
-                        {cat.subtitle}
-                      </p>
-                    </div>
-
-                    {/* Subcategories tags & action */}
-                    <div className="cat-card__foot">
-                      <div className="cat-card__more flex flex-wrap gap-1.5">
-                        {cat.subcategories.slice(0, 2).map((sub) => (
-                          <span
-                            key={sub}
-                            className="rounded bg-page px-2 py-0.5 text-xs text-ink-muted"
-                          >
-                            {sub}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs font-bold tracking-wider text-ink uppercase">
-                        <span>Inspect Specs</span>
-                        <ArrowRightIcon
-                          size={14}
-                          weight="bold"
-                          aria-hidden="true"
-                          className="text-accent transition-transform duration-300 group-hover:translate-x-1"
-                        />
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* The white card on the water: shrinks away as the card opens */}
-          <div className="cat-preview" data-cat="preview">
-            <p className="cat-preview__badge">
-              <span className="cat-preview__dot" aria-hidden="true" />
-              System 02 // Products
-            </p>
-
-            <div>
-              <Tide
-                as="p"
-                className="cat-preview__title display-type"
-                text="Engineered|Tackle|[Categories]."
-                drop
-              />
-              <p className="cat-preview__sub">
-                Scroll to expand the complete 8-system architecture
+              <p className="cat-preview__foot">
+                <span>08 Master Categories</span>
+                <ArrowUpRightIcon size={16} weight="bold" aria-hidden="true" />
               </p>
             </div>
 
-            <p className="cat-preview__foot">
-              <span>08 Master Categories</span>
-              <ArrowUpRightIcon size={16} weight="bold" aria-hidden="true" />
-            </p>
+            <CategoryWaterToggle enabled={enabled} onToggle={toggle} />
           </div>
-
-          <CategoryWaterToggle enabled={enabled} onToggle={toggle} />
         </div>
       </div>
 
@@ -565,6 +590,20 @@ export function ProductCategories() {
                 <XIcon size={20} weight="bold" />
               </button>
             </div>
+
+            {/* The category's photo, to the panel's edges (the close button sits on it) */}
+            {CATEGORY_MEDIA[selectedCategory.id] && (
+              <div className="cat-modal__photo">
+                <Image
+                  src={CATEGORY_MEDIA[selectedCategory.id].src}
+                  alt={CATEGORY_MEDIA[selectedCategory.id].alt}
+                  fill
+                  sizes="(min-width: 672px) 672px, 100vw"
+                  quality={75}
+                  className="cat-card__img"
+                />
+              </div>
+            )}
 
             {/* Modal Header (the right padding keeps a long name from running under the close button) */}
             <div className="pr-14">

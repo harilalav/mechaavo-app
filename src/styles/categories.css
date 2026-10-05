@@ -25,6 +25,17 @@
  * 0.25 over the page), which the lab never sees because it never scrolls. All the
  * sizes stay calc()s of clamp / vw / svh: nothing is measured, nothing needs a
  * refresh when the window resizes.
+ *
+ * Two viewport heights. A phone browser's toolbars show and hide as the page scrolls, so the
+ * viewport is between 100svh (toolbars out) and 100lvh (toolbars away). The content lays out against
+ * the small one (a pinned stage that jumped with the toolbars would be worse), but the stage itself
+ * is as tall as the large one and only the water, the card's window and its shadow paint to that
+ * height: a stage of exactly 100svh left a strip of white page showing below it whenever the toolbars
+ * were away, which flickered in and out as they came back on the small reverse movement that ends a
+ * flick. The catalog, the white card and the pause button sit in .cat-view, which is 100svh tall.
+ * Nothing in the card scrolls on its own either (a touch that started on the catalog was caught by
+ * it and the page did not move): a screen too short for all eight tiles has the timeline slide the
+ * content up by what does not fit, while the card is held open.
  */
 
 @property --open {
@@ -34,8 +45,12 @@
 }
 
 .cat-track {
-  /* scroll distance of the whole opening = (screens - 1) viewport heights; the only place it is set */
-  --cat-screens: 3;
+  /*
+   * scroll distance of the whole opening = (screens - 1) viewport heights; the only place it is set. A
+   * quarter screen at the start is the card at rest, the card opens over the next 0.6 of a screen, and
+   * the catalog is fully in at about 0.65 of a screen (sweep gate G16 keeps it under 0.75).
+   */
+  --cat-screens: 2.25;
   /*
    * the closed card: portrait, and never wider than the page column on a phone. The
    * column is measured as 100cqw (the stage below is a size container), not 100vw:
@@ -75,6 +90,11 @@
 /* the card's shadow exists only in the scrolling layout (below) */
 .cat-shadow {
   display: none;
+}
+
+/* the card's content: no box of its own in the plain layout, a 100svh one in the scrolling layout (below) */
+.cat-view {
+  display: contents;
 }
 
 /* — the water — */
@@ -197,11 +217,16 @@
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .cat-catalog {
+  .cat-catalog,
+  .cat-glass {
     background-color: color-mix(in srgb, var(--page) 94%, transparent);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+}
+/* the glass as a layer of its own exists only in the scrolling layout (below): in the plain one the catalog carries it */
+.cat-glass {
+  display: none;
 }
 
 /*
@@ -213,9 +238,11 @@
  *
  *   phone / tablet (< 1024px)   compact: number, name, action; 2 columns, 4 from 768px
  *   laptop and up, short        compact, a little roomier
- *   laptop and up, 46rem tall   full: adds the tag, the strapline and two sub-lines
- *   laptop and up, 56rem tall   full and roomy
- * The extras are in the inspector too, so nothing is lost by leaving them out here.
+ *   laptop and up, 46rem tall   full: adds the strapline
+ *   laptop and up, 56rem tall   full and roomy: adds the tag and two sub-lines
+ * Every tile has its photo (the strip along its top); it took the height the tag and the sub-lines
+ * had on a 46 to 56rem screen, so they wait for a taller one. They are in the inspector too, so
+ * nothing is lost by leaving them out here.
  */
 .cat-grid {
   --tile-gap: 0.5rem;
@@ -223,13 +250,16 @@
   --tile-stack: 0.5rem;
   --tile-min: 6.5rem;
   --tile-name: clamp(1rem, 4.6vw, 1.25rem);
+  /* the shape of the photo along the top of a tile, a strip: lures are long and low */
+  --tile-photo: 3 / 1;
 
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--tile-gap);
 }
 /* must come before the rule that brings the extras back */
-.cat-card__more {
+.cat-card__more,
+.cat-card__roomy {
   display: none;
 }
 /* the narrowest phones (320px): a little less padding and type so every label still sits on one line */
@@ -258,6 +288,7 @@
   .cat-grid {
     --tile-stack: 0.875rem;
     --tile-name: 1.5rem;
+    --tile-photo: 3.4 / 1;
   }
   .cat-card__more {
     /* back to whatever the element would be (block, inline, or the flex a utility gives it) */
@@ -274,7 +305,12 @@
 @media (min-width: 1024px) and (min-height: 56rem) {
   .cat-grid {
     --tile-pad: 1.25rem;
-    --tile-stack: 1.25rem;
+    --tile-stack: 1rem;
+    --tile-photo: 3.8 / 1;
+  }
+  /* the tag and the two sub-lines come back where there is height for them (the photo took some) */
+  .cat-card__roomy {
+    display: revert-layer;
   }
 }
 .cat-card__name {
@@ -395,6 +431,94 @@
   }
 }
 
+/*
+ * The photo of a category: along the top of its tile, to the tile's edges, and at the top of the
+ * inspector. The files are plain grayscale (docs/make-category-images.mjs), so all of the colour is
+ * the tokens', in the same layers as the water footage (see .cat-media): the photo multiplied onto
+ * the brand blue thinned with white, and a lift of white from the top (screen). Text never sits on
+ * it: the tile's name and action are below it, on the glass, and the index is on a chip of its own.
+ */
+.cat-card__photo,
+.cat-modal__photo {
+  --cat-z-chip: 1;
+
+  position: relative;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-white));
+}
+.cat-card__photo {
+  flex: none;
+  aspect-ratio: var(--tile-photo);
+  /* the tile's own padding is taken back, so the photo runs to its edges */
+  margin: calc(-1 * var(--tile-pad)) calc(-1 * var(--tile-pad)) 0;
+}
+.cat-card__photo::after,
+.cat-modal__photo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-white) 50%, transparent), transparent 70%);
+  mix-blend-mode: screen;
+}
+.cat-card__img {
+  object-fit: cover;
+  mix-blend-mode: multiply;
+  filter: brightness(1.12) contrast(1.05);
+  transition: transform 460ms var(--ease-out);
+}
+/* the index, on a chip over the photo (12px is the floor for any text) */
+.cat-card__index {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: var(--cat-z-chip);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background-color: color-mix(in srgb, var(--page) 88%, transparent);
+  /* concentric with the tile's own 16px corner, 8px in from it */
+  border-radius: 0.5rem;
+}
+/* a touch of life: the photo leans in as the tile is touched (on a pointer, for a press, for the keyboard) */
+.cat-card:is(:focus-visible, :active) .cat-card__img {
+  transform: scale(1.05);
+}
+@media (hover: hover) {
+  .cat-card:hover .cat-card__img {
+    transform: scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-card__img {
+    transition: none;
+  }
+  .cat-card:is(:focus-visible, :active) .cat-card__img {
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .cat-card:hover .cat-card__img {
+    transform: none;
+  }
+}
+
+/* the inspector's photo: to the panel's edges (its padding is 1.5rem, 2.5rem from md), a strip like the tiles' */
+.cat-modal__photo {
+  aspect-ratio: 3 / 1;
+  margin: -1.5rem -1.5rem 1.5rem;
+}
+@media (min-width: 768px) {
+  .cat-modal__photo {
+    margin: -2.5rem -2.5rem 1.75rem;
+  }
+}
+
 /* — the white preview card (shown only while scrolling) — */
 
 .cat-preview {
@@ -477,7 +601,17 @@
     position: sticky;
     top: 0;
     height: 100svh;
+    /* paints to the large viewport: see the header. Where lvh is unknown the line above stays. */
+    height: 100lvh;
     overflow: hidden;
+  }
+
+  /* the content is laid out against the small viewport, from the top of the stage */
+  .cat-track:not([data-static]) .cat-view {
+    position: absolute;
+    inset: 0 0 auto;
+    display: block;
+    height: 100svh;
   }
 
   /*
@@ -491,8 +625,15 @@
     position: absolute;
     inset: 0;
     min-height: 0;
+    /*
+     * The closed card is centred in the small viewport (the top inset), the bottom inset is whatever
+     * is left of the frame, which is as tall as the large one: at --open 1 every inset is 0 and the
+     * water fills it all, under the toolbars when they are away.
+     */
     clip-path: inset(
-      calc((100% - var(--card-h)) / 2 * (1 - var(--open)))
+      calc((100svh - var(--card-h)) / 2 * (1 - var(--open)))
+      calc((100% - var(--card-w)) / 2 * (1 - var(--open)))
+      calc((100% - var(--card-h) - (100svh - var(--card-h)) / 2) * (1 - var(--open)))
       calc((100% - var(--card-w)) / 2 * (1 - var(--open)))
       round calc(var(--card-r) * (1 - var(--open)))
     );
@@ -502,11 +643,11 @@
   .cat-track:not([data-static]) .cat-shadow {
     --open: 0;
     position: absolute;
-    inset: 0;
+    inset: calc((100svh - var(--card-h)) / 2) 0 auto;
     display: block;
     width: var(--card-w);
     height: var(--card-h);
-    margin: auto;
+    margin: 0 auto;
     border-radius: var(--card-r);
     pointer-events: none;
     opacity: max(0, calc(1 - var(--open) * 5));
@@ -525,6 +666,8 @@
   .cat-track:not([data-static]) .cat-media {
     --open: 0;
     --s0: max(tan(atan2(var(--card-w), 100cqw)), tan(atan2(var(--card-h), 100svh)));
+    /* the middle of the small viewport, where the closed card sits (the water itself is as tall as the large one) */
+    transform-origin: 50% 50svh;
     transform: scale(calc(var(--s0) + (1 - var(--s0)) * var(--open)));
   }
 
@@ -544,12 +687,36 @@
    * is open (the timeline sets data-open), so the closed card's water is not a
    * hidden button.
    */
+  .cat-track:not([data-static]) .cat-glass {
+    position: absolute;
+    inset: 0;
+    z-index: var(--cat-z-catalog);
+    display: block;
+    pointer-events: none;
+    opacity: 0;
+    background-color: color-mix(in srgb, var(--page) 50%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    backdrop-filter: blur(18px) saturate(1.2);
+  }
+  /* (the same rule as the reduced-transparency one above, which a layer of equal specificity would lose to this) */
+  @media (prefers-reduced-transparency: reduce) {
+    .cat-track:not([data-static]) .cat-glass {
+      background-color: color-mix(in srgb, var(--page) 94%, transparent);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
   .cat-track:not([data-static]) .cat-catalog {
     position: absolute;
     inset: 0;
     min-height: 0;
+    /* its glass is the layer behind it (.cat-glass) */
+    background-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     padding-block: clamp(1.25rem, 3vw, 2.5rem) 4rem;
-    overflow-y: auto;
+    /* no overflow-y: nothing in the card scrolls on its own (the timeline slides the content up, see the header) */
     opacity: 0;
     pointer-events: none;
   }
@@ -631,7 +798,8 @@
 /* and in the scrolling layout the catalog's own padding gives up some height too (the pause button still clears the grid at the end) */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-height: 34rem) {
   .cat-track:not([data-static]) .cat-catalog {
-    padding-block: 0.75rem 3.25rem;
+    /* the pause button is 2.75rem tall and 1rem off the bottom: the last row ends above it once the content has slid up */
+    padding-block: 0.75rem 3.75rem;
   }
 }
 

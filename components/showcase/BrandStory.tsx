@@ -105,9 +105,8 @@ export function BrandStory() {
 
       <section
         id={SECTION_IDS.commitment}
-        className="relative isolate overflow-hidden bg-page py-24 md:pt-40 md:pb-56"
+        className="relative isolate overflow-hidden bg-page py-24 md:py-36"
       >
-        <WaterLight variant="bottom" />
         <div className="page-container">
           {/* a vertical stack, not the two columns the story section uses: each section keeps its own layout */}
           <div className="max-w-4xl">

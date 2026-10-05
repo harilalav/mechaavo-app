@@ -27,22 +27,39 @@ export type FishState =
  * Master-timeline positions (0-1) where the fishing story changes beat. The
  * very first scroll sets the lure drifting toward the fish (`lead`), so the page
  * answers at once; the fish notices it at once, circles and strikes within
- * roughly the first seven notches (about a seventh of the way through). The catch then
- * has a long stretch of scroll to itself (the fight, the brand statement), after
- * which the fish is drawn up out of the water (`reel`) before the next section
- * slides over the hero.
+ * roughly the first seven notches. After the bite the story is short on purpose: the
+ * lure is drawn up out of the water (`reel`) a quarter of a screen of scroll after the
+ * bite and is gone a little over half a screen later, then the next section slides over
+ * the hero.
+ *
+ * The story is 1.9 screens of scroll long on a landscape layout and 1.5 on a stacked one
+ * (`--hero-screens` in src/styles/underwater.css minus the hero's own screen and the
+ * curtain's). Every beat is a share of it, so the bite lands the same distance down the
+ * page on both (about 0.6 screens, plus the scrub's lag): these are the numbers of the
+ * earlier 4.1-screen story, scaled by 2.15, so the approved bite did not move. Anything
+ * after the bite is measured in screens from it: sweep gate G16 (scripts/design-sweep.mjs)
+ * fails if the budget is broken.
  */
 export const STORY = {
-  engageStart: 0.01,
-  curious: 0.04,
-  approaching: 0.08,
-  striking: 0.14,
-  caught: 0.17,
+  engageStart: 0.02,
+  curious: 0.086,
+  approaching: 0.172,
+  striking: 0.3,
+  caught: 0.365,
   /** The lure has drifted all the way to the fish by here. */
-  leadEnd: 0.06,
+  leadEnd: 0.129,
+  /**
+   * The thresholds the primary fish reads (see `LEVELS` in primaryFish.ts): it notices the lure, stalks
+   * it, winds up and strikes. The strike lands a moment after the last, close to `caught`.
+   */
+  notice: 0.043,
+  windup: 0.215,
+  strike: 0.322,
+  /** Already being past a threshold makes it slightly easier to stay past it. */
+  hysteresis: 0.032,
   /** The hooked fish starts to be drawn out of the water, and is gone by `reelEnd`. */
   reelStart: 0.45,
-  reelEnd: 0.75,
+  reelEnd: 0.82,
 } as const;
 
 /** The beat for a scroll position (the brief's five fish states). */

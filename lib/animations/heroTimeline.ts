@@ -1,6 +1,7 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SECTION_IDS } from "../config/sections";
+import { scrubSeconds } from "./scrub";
 import { LURE_ZOOM_GAIN } from "../hero/lureConfig";
 import { resetHeroScene, STORY, type HeroScene } from "../underwater/story";
 
@@ -82,6 +83,22 @@ const ZOOM_KEYS = [
   { at: 40, duration: 60, to: 1.16, phone: 1.1, ease: "sine.out" },
 ] as const;
 
+/**
+ * The positions below were authored, in units of 1% of the story, for a story 4.1 screens long, with the
+ * catch at unit 17. The story is shorter now (see STORY in lib/underwater/story.ts), so every unit is
+ * mapped: up to the catch they are stretched by the same factor as the beats the fish reads (the approved
+ * bite and everything before it keep the distance down the page they had), and what comes after the catch is
+ * fitted into the rest. `at` maps a position, `span` a length starting at one.
+ */
+const AUTHORED_CAUGHT = 17;
+const at = (unit: number): number => {
+  const caught = STORY.caught * 100;
+  return unit <= AUTHORED_CAUGHT
+    ? unit * (caught / AUTHORED_CAUGHT)
+    : caught + (unit - AUTHORED_CAUGHT) * ((100 - caught) / (100 - AUTHORED_CAUGHT));
+};
+const span = (from: number, length: number): number => at(from + length) - at(from);
+
 let pluginsRegistered = false;
 
 export function createHeroTimeline({ root, track, scene, stacked }: HeroTimelineOptions): () => void {
@@ -135,7 +152,7 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
       trigger: track,
       start: "top top",
       end: () => `+=${storyDistance()}`,
-      scrub: 1,
+      scrub: scrubSeconds(),
       invalidateOnRefresh: true,
     },
   });
@@ -168,24 +185,24 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
   // camera: wide, then closer at the catch, then a slow dolly while the fish fights
   for (const key of ZOOM_KEYS) {
     const zoom = stacked ? key.phone : key.to;
-    tl.to(scene, { zoom, duration: key.duration, ease: key.ease }, key.at);
+    tl.to(scene, { zoom, duration: span(key.at, key.duration), ease: key.ease }, at(key.at));
     if (el.lure) {
       tl.to(
         el.lure,
-        { scale: 1 + (zoom - 1) * LURE_ZOOM_GAIN, duration: key.duration, ease: key.ease },
-        key.at,
+        { scale: 1 + (zoom - 1) * LURE_ZOOM_GAIN, duration: span(key.at, key.duration), ease: key.ease },
+        at(key.at),
       );
     }
   }
 
   // water & attention (the water stays lively through the fight; visitors leave the lure at the bite)
-  tl.to(scene, { flow: 1.3, duration: 8, ease: "sine.inOut" }, 2)
-    .to(scene, { flow: 1, duration: 8, ease: "sine.inOut" }, 10)
-    .to(scene, { flow: 0.85, duration: 6, ease: "sine.out" }, 17)
-    .to(scene, { flow: 0.95, duration: 20, ease: "sine.inOut" }, 30);
-  tl.to(scene, { engage: 0.7, duration: 5, ease: "sine.inOut" }, 1)
-    .to(scene, { engage: 1, duration: 6, ease: "sine.inOut" }, 6)
-    .to(scene, { engage: 0, duration: 5, ease: "sine.inOut" }, 16);
+  tl.to(scene, { flow: 1.3, duration: span(2, 8), ease: "sine.inOut" }, at(2))
+    .to(scene, { flow: 1, duration: span(10, 8), ease: "sine.inOut" }, at(10))
+    .to(scene, { flow: 0.85, duration: span(17, 6), ease: "sine.out" }, at(17))
+    .to(scene, { flow: 0.95, duration: span(30, 20), ease: "sine.inOut" }, at(30));
+  tl.to(scene, { engage: 0.7, duration: span(1, 5), ease: "sine.inOut" }, at(1))
+    .to(scene, { engage: 1, duration: span(6, 6), ease: "sine.inOut" }, at(6))
+    .to(scene, { engage: 0, duration: span(16, 5), ease: "sine.inOut" }, at(16));
 
   // after the fight, more scroll draws the hooked fish up out of the water along the line; scrolling
   // back lowers it again. (The engine eases this and holds it until the fish has fought a while.)
@@ -197,37 +214,41 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
 
   // copy: the headline makes way for the fish (the brand statement is not here: it arrives with the catch)
   if (el.supportGroup) {
-    tl.to(el.supportGroup, { autoAlpha: 0, y: -22, duration: 6, ease: "power1.in" }, stacked ? 0.5 : 1);
+    tl.to(
+      el.supportGroup,
+      { autoAlpha: 0, y: -22, duration: span(stacked ? 0.5 : 1, 6), ease: "power1.in" },
+      at(stacked ? 0.5 : 1),
+    );
   }
   if (el.titleGroup) {
     tl.to(
       el.titleGroup,
-      { autoAlpha: 0, xPercent: -6, y: -28, duration: 7, ease: "power1.in" },
-      stacked ? 1.5 : 2,
+      { autoAlpha: 0, xPercent: -6, y: -28, duration: span(stacked ? 1.5 : 2, 7), ease: "power1.in" },
+      at(stacked ? 1.5 : 2),
     );
   }
   // while the headline is up, fish ease off underneath it (the engine reads `scene.copy`)
-  tl.to(scene, { copy: 0, duration: 7, ease: "power1.in" }, stacked ? 1.5 : 2);
+  tl.to(scene, { copy: 0, duration: span(stacked ? 1.5 : 2, 7), ease: "power1.in" }, at(stacked ? 1.5 : 2));
 
   // captions: one phrase at a time, each naming what the camera is looking at
   const [capRest, capWater, capStrike] = el.captions;
-  if (capRest) tl.to(capRest, { autoAlpha: 0, duration: 2 }, 3);
+  if (capRest) tl.to(capRest, { autoAlpha: 0, duration: span(3, 2) }, at(3));
   if (capWater) {
-    tl.to(capWater, { autoAlpha: 1, duration: 2 }, 5).to(capWater, { autoAlpha: 0, duration: 2 }, 11);
+    tl.to(capWater, { autoAlpha: 1, duration: span(5, 2) }, at(5)).to(capWater, { autoAlpha: 0, duration: span(11, 2) }, at(11));
   }
   if (capStrike) {
-    tl.to(capStrike, { autoAlpha: 1, duration: 2 }, 13).to(capStrike, { autoAlpha: 0, duration: 2 }, 19);
+    tl.to(capStrike, { autoAlpha: 1, duration: span(13, 2) }, at(13)).to(capStrike, { autoAlpha: 0, duration: span(19, 2) }, at(19));
   }
 
   // environment: shafts dim as we descend and the haze thickens
   if (el.rays) {
-    tl.to(el.rays, { opacity: 0.4, yPercent: -3, duration: 70 }, 0).to(
+    tl.to(el.rays, { opacity: 0.4, yPercent: -3, duration: span(0, 70) }, 0).to(
       el.rays,
-      { opacity: 0.22, duration: 30 },
-      70,
+      { opacity: 0.22, duration: span(70, 30) },
+      at(70),
     );
   }
-  if (el.haze) tl.to(el.haze, { opacity: 1, duration: 60 }, 40);
+  if (el.haze) tl.to(el.haze, { opacity: 1, duration: span(40, 60) }, at(40));
   if (el.bg) {
     tl.to(el.bg, { scale: 1.12, transformOrigin: "64% 48%", duration: 100 }, 0);
   }
