@@ -47,42 +47,46 @@ export function HeroProduct({ asset }: { asset: LureAsset | null }) {
 
   return (
     <div className="hero-lure-slot" data-hero="lure-slot" data-hero-anchor="slot">
-      <div className="hero-lure" data-hero="lure-wrapper">
-        <div className="hero-lure__pull" data-hero="lure-pull">
-          <div className="hero-lure__shake" data-hero="lure-shake">
-            <div
-              className="hero-lure__art"
-              data-hero-anchor="art"
-              style={{ aspectRatio: aspect }}
-            >
-              {mode === "vector" ? (
-                <LureArt />
-              ) : (
-                <>
-                  {mode === "raster" && asset && (
-                    <Image
-                      src={asset.src}
-                      alt="Mechaavo fishing lure"
-                      fill
-                      priority
-                      sizes="(min-width: 768px) 30vw, 60vw"
-                      className="hero-lure__photo object-contain"
-                    />
-                  )}
-                  {ANCHOR_NAMES.map((name) => (
-                    <span
-                      key={name}
-                      className="hero-anchor"
-                      data-hero-anchor={name}
-                      aria-hidden="true"
-                      style={{
-                        left: `${LURE_ANCHORS[name].x * 100}%`,
-                        top: `${LURE_ANCHORS[name].y * 100}%`,
-                      }}
-                    />
-                  ))}
-                </>
-              )}
+      {/* the lure leaves as the camera sinks under the catalog (heroTimeline.ts writes this wrapper's opacity:
+          the slot's own belongs to the lure's arrival, data-lure) */}
+      <div className="hero-lure-fade">
+        <div className="hero-lure" data-hero="lure-wrapper">
+          <div className="hero-lure__pull" data-hero="lure-pull">
+            <div className="hero-lure__shake" data-hero="lure-shake">
+              <div
+                className="hero-lure__art"
+                data-hero-anchor="art"
+                style={{ aspectRatio: aspect }}
+              >
+                {mode === "vector" ? (
+                  <LureArt />
+                ) : (
+                  <>
+                    {mode === "raster" && asset && (
+                      <Image
+                        src={asset.src}
+                        alt="Mechaavo fishing lure"
+                        fill
+                        priority
+                        sizes="(min-width: 768px) 30vw, 60vw"
+                        className="hero-lure__photo object-contain"
+                      />
+                    )}
+                    {ANCHOR_NAMES.map((name) => (
+                      <span
+                        key={name}
+                        className="hero-anchor"
+                        data-hero-anchor={name}
+                        aria-hidden="true"
+                        style={{
+                          left: `${LURE_ANCHORS[name].x * 100}%`,
+                          top: `${LURE_ANCHORS[name].y * 100}%`,
+                        }}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

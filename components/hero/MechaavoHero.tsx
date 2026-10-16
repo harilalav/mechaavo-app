@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { LureAsset } from "@/lib/hero/lureAsset";
 import { STACKED_QUERY } from "@/lib/underwater/quality";
 import { whenIdle } from "@/lib/utils/idle";
@@ -13,8 +13,8 @@ import { UnderwaterCanvas } from "./UnderwaterCanvas";
 
 /**
  * Soft light shafts from the surface. Positions in % of the hero, lean in deg,
- * `a` = peak opacity in % (white shafts read against the blue mid-water; the
- * two accent shafts are fainter cyan).
+ * `a` = peak opacity in % (white shafts read against the azure mid-water;
+ * the two accent shafts are fainter azure, the sea's own colour).
  */
 const RAYS = [
   { x: 6, w: 16, r: -13, a: 38, accent: false },
@@ -32,10 +32,12 @@ const RAYS = [
  *   - mounts the scrubbed story timeline via gsap.matchMedia so it is rebuilt
  *     when the layout switches (split ↔ stacked) and skipped for reduced motion.
  *
- * The hero sits in a tall track (.hero-track) and is `position: sticky` inside
- * it, so it stays on screen while the story plays out over the track's scroll
- * distance. No pin spacer, no JavaScript pinning: the browser does the sticking
- * and the next section is pulled up over the hero's last screen like a curtain.
+ * The hero sits in its track (.hero-track) and is `position: sticky` inside it
+ * (with script and motion allowed), so it stays on screen while the story plays out
+ * over the spacer's scroll distance, and then while the categories (passed in as
+ * `children`) scroll up over it: the hero is their live backdrop, the plates rise
+ * through its water (client review 2026-10-16: no sheet sliding over it any more).
+ * No JavaScript pinning: the browser does the sticking.
  *
  * Two kinds of layer, one stacking context:
  *   full-bleed  the water: bg, rays, haze, canvases, vignette, caustic light
@@ -47,7 +49,7 @@ const RAYS = [
  * both. The stage comes first in the DOM so keyboard and screen-reader order
  * starts at the nav.
  */
-export function MechaavoHero({ lureAsset }: { lureAsset: LureAsset | null }) {
+export function MechaavoHero({ lureAsset, children }: { lureAsset: LureAsset | null; children?: ReactNode }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLElement>(null);
   const [scene] = useState(createHeroScene);
@@ -130,6 +132,8 @@ export function MechaavoHero({ lureAsset }: { lureAsset: LureAsset | null }) {
                   "--ray-w": `${ray.w}%`,
                   "--ray-r": `${ray.r}deg`,
                   "--ray-a": `${ray.a}%`,
+                  // the order, so each shaft's shimmer runs on its own period and phase
+                  "--ray-i": i,
                 } as CSSProperties
               }
             >
@@ -145,7 +149,14 @@ export function MechaavoHero({ lureAsset }: { lureAsset: LureAsset | null }) {
           <div className="hero-caustics__layer hero-caustics__layer--a" />
           <div className="hero-caustics__layer hero-caustics__layer--b" />
         </div>
+        {/* the deeper water the camera sinks into while the catalog rises (heroTimeline.ts writes its opacity) */}
+        <div className="hero-depth" aria-hidden="true" />
       </section>
+      {/* the story's scroll distance (underwater.css): only with script and motion allowed does it have a height */}
+      <div className="hero-spacer" aria-hidden="true" />
+      {children}
+      {/* keeps the hero pinned to the catalog's end while #story comes up over it (underwater.css) */}
+      <div className="hero-tail" aria-hidden="true" />
     </div>
   );
 }
