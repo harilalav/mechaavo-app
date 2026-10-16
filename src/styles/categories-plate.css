@@ -1,0 +1,468 @@
+/*
+ * One category plate (components/showcase/CategoryCard.tsx): a specimen on the page.
+ *
+ * A white plate with a photo window set into it like a mount. The photo is shown as it is, in its
+ * own colour (client review 2026-10-16: "why are we tinting and gray scaling the category images":
+ * they had been turned grayscale and tinted with the brand blue, which made every product the same
+ * washed grey-blue). When the plate is touched the photo leans in a little, a ring of light runs round the
+ * plate's edge where the pointer is, the arrow fills and the name's last word takes the ink plate (there is
+ * no line and ring dropping onto the lure any more: it sat on top of the product, client round 3). Under the photo a depth ruler shows
+ * where in the water the lure works (parsed from the category's own depth text, lib/config/depth.ts).
+ *
+ * One switch drives all of it: `--lit` is 1 while the plate is touched (hover on a pointer, keyboard
+ * focus, a press) and every layer computes its look from it, so a state is written once and
+ * every transition runs from the same cause. `:hover` is only used under (hover: hover), so a tap
+ * never leaves a plate stuck lit; on touch the press does it.
+ *
+ * Colours are tokens and roles. The water tokens (D12) appear here only on the depth ruler, which is a
+ * water column, and in the optional glass plates' shadow (the deep under them); the text never wears them.
+ * Transform, translate and opacity only.
+ */
+
+/*
+ * White or glass. The plate's ground, rim and shadows are tokens set here. **White is the default** (client
+ * review 2026-10-16, round 3: tried both over the water, "the white cards are actually much better"). Glass
+ * is kept as an opt-in, `data-plates="glass"` on the section, only while the hero's water is behind the
+ * catalog: the page's white thinned to 74% so the water shows through, a white rim, the shadow tinted with
+ * the deep. No backdrop blur: a blur over a live canvas is paid per plate on every frame.
+ */
+.cat-grid {
+  --glass-fill: var(--page);
+  --glass-rim: var(--line);
+  --glass-shadow: 0 18px 30px -22px color-mix(in srgb, var(--color-secondary) 34%, transparent);
+  --glass-shadow-lit: 0 26px 38px -22px color-mix(in srgb, var(--color-secondary) 30%, transparent);
+  --glass-hairline: color-mix(in srgb, var(--line) 55%, transparent);
+}
+@media (prefers-reduced-transparency: no-preference) {
+  .hero-track[data-backdrop] .cat-section[data-plates="glass"] .cat-grid {
+    --glass-fill: color-mix(in srgb, var(--page) 74%, transparent);
+    --glass-rim: color-mix(in srgb, var(--color-white) 70%, transparent);
+    --glass-shadow: 0 18px 34px -22px color-mix(in srgb, var(--water-deep) 55%, transparent);
+    --glass-shadow-lit: 0 28px 44px -22px color-mix(in srgb, var(--water-deep) 60%, transparent);
+    --glass-hairline: color-mix(in srgb, var(--color-secondary) 28%, transparent);
+  }
+}
+
+.cat-card {
+  /* what is lit, 0 or 1 (see above) */
+  --lit: 0;
+  /* the layers inside a plate, lowest first */
+  --cat-z-cast: 3;
+  --cat-z-chip: 4;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tile-stack);
+  padding: var(--tile-inset) var(--tile-inset) var(--tile-pad);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--tile-radius);
+  background-color: var(--glass-fill);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  isolation: isolate;
+  /* a thin contact line on top, a long soft shadow below, tinted with the slate of the ink (the bright blue read as a glow on white) */
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-white) 80%, transparent),
+    var(--glass-shadow);
+  /*
+   * Touched or left, the plate lifts and its edge and shadow fade (D15). Nothing paints a new blur or a new
+   * border colour while it does: the hairline never changes, the deeper shadow (::after) and the light on the
+   * edge (::before) are layers whose opacity follows --lit. Leaving is about 65% of entering, on the soft curve
+   * (--ease-fade): ease-out starts at full speed and made the edge pop from grey to cyan in two frames.
+   */
+  --plate-in: 420ms;
+  --plate-out: 280ms;
+  transition:
+    transform var(--plate-out) var(--ease-fade),
+    box-shadow 180ms var(--ease-fade);
+}
+.cat-card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+/* touched: keyboard focus, a press, and (further down) a pointer over it */
+.cat-card:is(:focus-visible, :active) {
+  --lit: 1;
+
+  transform: translateY(-4px);
+  transition-duration: var(--plate-in), 180ms;
+}
+/* a physical push when pressed: it starts at once (the soft curve would wait), so it keeps --ease-out */
+.cat-card:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+}
+@media (hover: hover) {
+  .cat-card:hover {
+    --lit: 1;
+
+    transform: translateY(-4px);
+    transition-duration: var(--plate-in), 180ms;
+  }
+  .cat-card:hover:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-out);
+  }
+}
+
+/* the deeper shadow of a lifted plate, laid under it; its opacity is the only thing that animates */
+.cat-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: var(--glass-shadow-lit);
+  opacity: var(--lit);
+  transition: opacity var(--plate-out) var(--ease-fade);
+}
+.cat-card:is(:focus-visible, :active)::after,
+.cat-card:is(:focus-visible, :active)::before {
+  transition-duration: var(--plate-in);
+}
+/* pressed: the plate sits down on the page, so the lifted shadow goes */
+.cat-card:active::after {
+  opacity: 0;
+  transition-duration: 160ms;
+}
+@media (hover: hover) {
+  .cat-card:hover::after,
+  .cat-card:hover::before {
+    transition-duration: var(--plate-in);
+  }
+  .cat-card:hover:active::after {
+    opacity: 0;
+    transition-duration: 160ms;
+  }
+}
+
+/*
+ * The ring of light round the plate's edge, under the pointer: a radial highlight in the one accent,
+ * cut down to the 1px border by a mask. --mx / --my are set by categoryPointer.ts (fine pointers only);
+ * without them the ring sits at the top centre and only shows while the plate is lit.
+ */
+.cat-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: var(--cat-z-cast);
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  /* the edge of a touched plate: a soft accent all the way round and a brighter spot under the pointer */
+  background:
+    radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), var(--accent), transparent 68%),
+    linear-gradient(color-mix(in srgb, var(--accent) 42%, transparent) 0 0);
+  -webkit-mask:
+    linear-gradient(var(--ink) 0 0) content-box,
+    linear-gradient(var(--ink) 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(var(--ink) 0 0) content-box,
+    linear-gradient(var(--ink) 0 0);
+  mask-composite: exclude;
+  opacity: var(--lit);
+  transition: opacity var(--plate-out) var(--ease-fade);
+}
+
+/* — the photo window — */
+
+.cat-card__stage {
+  position: relative;
+  display: block;
+  flex: none;
+  aspect-ratio: var(--tile-photo);
+  overflow: hidden;
+  isolation: isolate;
+  /* concentric with the plate's own corner, one mount-width in from it */
+  border-radius: calc(var(--tile-radius) - var(--tile-inset));
+  /* what shows while the photo is on its way, and round it if its ground is not the same grey */
+  background-color: var(--page-alt);
+}
+.cat-card__img {
+  object-fit: cover;
+  /* a touch of life: a little larger than its window at rest (so the reveal's settle has somewhere to end), leaning in when the plate is touched */
+  transform: scale(calc(1.02 + 0.05 * var(--lit)));
+  transition: transform 760ms var(--ease-out);
+}
+
+/* the surface: the line of light that travels up through the window as the photo is revealed (categoriesReveal.ts). Never seen at rest. */
+.cat-card__surface {
+  position: absolute;
+  inset: 0;
+  z-index: var(--cat-z-cast);
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--accent) 0,
+    color-mix(in srgb, var(--accent) 55%, transparent) 2px,
+    color-mix(in srgb, var(--accent) 22%, transparent) 5px,
+    transparent 18px
+  );
+}
+
+/* the index, on a chip over the photo (12px is the floor for any text) */
+.cat-card__index {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: var(--cat-z-chip);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background-color: color-mix(in srgb, var(--page) 88%, transparent);
+  /* concentric with the window's corner, 8px in from it */
+  border-radius: 0.5rem;
+}
+
+/* — the body — */
+
+.cat-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tile-stack);
+  /* the mount's inset is already round the photo: the text keeps the plate's own padding */
+  padding-inline: calc(var(--tile-pad) - var(--tile-inset));
+}
+
+.cat-card__name {
+  width: fit-content;
+  padding-bottom: 0.08em;
+  font-size: var(--tile-name);
+}
+
+/* the depth ruler: a short water column laid on its side, the lure's range lit on it */
+.cat-card__depth {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: auto;
+}
+.cat-gauge {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  border-radius: 3px;
+  /* shallow to deep, thinned into the page, with a gap in it at 10 ft and 100 ft (where depth.ts ticks the scale) */
+  background:
+    linear-gradient(var(--page), var(--page)) 40% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--page), var(--page)) 77% 0 / 1px 100% no-repeat,
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--water) 30%, var(--page)),
+      color-mix(in srgb, var(--water-deep) 38%, var(--page))
+    );
+}
+.cat-gauge__bar {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: calc(var(--g0) * 100%);
+  width: calc((var(--g1) - var(--g0)) * 100%);
+  border-radius: 4px;
+  background: linear-gradient(to right, var(--water-mid), var(--water-deep));
+  transform-origin: 0 50%;
+}
+.cat-card__depth-label {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.cat-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--glass-hairline);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* the arrow in a ring: fills with ink and leans forward when the plate is touched */
+.cat-card__go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid color-mix(in srgb, var(--ink) calc(var(--lit) * 100%), var(--line));
+  border-radius: 50%;
+  color: color-mix(in srgb, var(--page) calc(var(--lit) * 100%), var(--ink));
+  background-color: color-mix(in srgb, var(--ink) calc(var(--lit) * 100%), var(--page));
+  translate: calc(var(--lit) * 3px) 0;
+  transition:
+    background-color 260ms var(--ease-out),
+    border-color 260ms var(--ease-out),
+    color 260ms var(--ease-out),
+    translate 320ms var(--ease-out);
+}
+
+/*
+ * The cast plate on the name's last word (Tide's Mark, the same plate as the
+ * headings and the buttons), closed until the plate is touched: hover on a pointer,
+ * keyboard focus or a press anywhere. Wipe in, the light crosses once, wipe back
+ * out quicker (tide-button.css has the timings and the reasons).
+ */
+.cat-card__name .tide__plate {
+  transform: scaleX(0) skewX(var(--tide-skew));
+  transition: transform var(--btn-out) var(--btn-ease);
+}
+/* the plate is closed until the plate is touched, so the word is ink until then and turns to the plate's white as it covers it */
+.cat-card__name .tide__mark {
+  color: var(--ink);
+  transition: color var(--btn-color);
+}
+.cat-card:is(:focus-visible, :active) .cat-card__name .tide__mark {
+  color: var(--plate-ink);
+}
+.cat-card:is(:focus-visible, :active) .cat-card__name .tide__plate {
+  transform: scaleX(1) skewX(var(--tide-skew));
+  transition-duration: var(--btn-in);
+}
+.cat-card:is(:focus-visible, :active) .cat-card__name .tide__glint {
+  animation: tide-glint-again 1100ms ease-in-out 260ms both;
+}
+@media (hover: hover) {
+  .cat-card:hover .cat-card__name .tide__mark {
+    color: var(--plate-ink);
+  }
+  .cat-card:hover .cat-card__name .tide__plate {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    transition-duration: var(--btn-in);
+  }
+  .cat-card:hover .cat-card__name .tide__glint {
+    animation: tide-glint-again 1100ms ease-in-out 260ms both;
+  }
+}
+
+/*
+ * A short screen (a phone on its side, at most 34rem tall): the plate is as low as it can be. The action row folds
+ * away and its arrow moves up beside the name, so the plate is a photo, a name with its arrow, and the depth ruler:
+ * every row of plates that is a screen of scroll is scroll the reader has to spend (sweep G16 caps it).
+ */
+@media (max-height: 34rem) {
+  .cat-card__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.5rem;
+    align-items: center;
+  }
+  .cat-card__name {
+    grid-column: 1;
+  }
+  .cat-card__depth {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+  .cat-card__foot {
+    display: contents;
+  }
+  .cat-card__foot > span:first-child {
+    display: none;
+  }
+  .cat-card__go {
+    grid-column: 2;
+    grid-row: 1;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* — fallbacks — */
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-card {
+    transition: none;
+  }
+  .cat-card:is(:focus-visible, :active) {
+    transform: none;
+  }
+  /* the photo stays still; the ring and the arrow still say "this one" */
+  .cat-card__img {
+    transform: none;
+    transition: none;
+  }
+  .cat-card::before,
+  .cat-card::after,
+  .cat-card__go {
+    transition: none;
+  }
+  /* no wipe, no light: the plate fades in */
+  .cat-card__name .tide__plate {
+    transform: scaleX(1) skewX(var(--tide-skew));
+    opacity: 0;
+    transition: opacity 150ms linear;
+  }
+  /* the word turns with the plate */
+  .cat-card__name .tide__mark {
+    transition: color 150ms linear;
+  }
+  .cat-card:is(:focus-visible, :active) .cat-card__name .tide__plate {
+    opacity: 1;
+  }
+  .cat-card__name .tide__glint {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (hover: hover) {
+  .cat-card:hover {
+    transform: none;
+  }
+  .cat-card:hover .cat-card__name .tide__plate {
+    opacity: 1;
+  }
+}
+
+/* high contrast has no plate (tide.css hides it): the word is underlined instead. No line or ring: system colours. */
+@media (forced-colors: active) {
+  .cat-card {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+  .cat-card:is(:focus-visible, :active) {
+    border-color: Highlight;
+  }
+  .cat-card::before,
+  .cat-card::after,
+  .cat-card__surface {
+    display: none;
+  }
+  .cat-gauge__bar {
+    background: Highlight;
+  }
+  .cat-card:is(:focus-visible, :active) .cat-card__name .tide__mark {
+    text-decoration: underline;
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.14em;
+  }
+}
+@media (forced-colors: active) and (hover: hover) {
+  .cat-card:hover {
+    border-color: Highlight;
+  }
+  .cat-card:hover .cat-card__name .tide__mark {
+    text-decoration: underline;
+    text-decoration-thickness: 0.1em;
+    text-underline-offset: 0.14em;
+  }
+}

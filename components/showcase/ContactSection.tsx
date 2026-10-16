@@ -60,7 +60,7 @@ export function ContactSection() {
   return (
     <section
       id={SECTION_IDS.contact}
-      className="relative isolate overflow-hidden bg-page-alt py-24 md:py-36"
+      className="section-y relative isolate overflow-hidden bg-page-alt"
     >
       <WaterLight variant="soft" />
       <div className="page-container">
@@ -75,9 +75,9 @@ export function ContactSection() {
         </p>
 
         {list.length > 0 && (
-          <ul className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 md:mt-16">
+          <ul data-surface-group="" className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 md:mt-12">
             {list.map(({ key, label, Icon, href, external, lines }) => (
-              <li key={key} className="min-w-0">
+              <li key={key} data-surface="" className="min-w-0">
                 <a
                   href={href}
                   className="contact-link tide-btn"
