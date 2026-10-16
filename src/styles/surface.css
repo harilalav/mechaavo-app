@@ -1,0 +1,28 @@
+/*
+ * The surfacing entrance for the content below the hero (lib/animations/surfaceReveal.ts, started by
+ * components/ui/SurfaceReveal.tsx): the principles' rows and the contact tiles rise a short way out of the
+ * water and fade in, once, as they come into view.
+ *
+ * Held back only where it will be played: under (scripting: enabled) and (prefers-reduced-motion:
+ * no-preference). Held back by opacity and transform only (never visibility or display), so a member keeps
+ * its place in the tab order and the accessibility tree and takes no pointer while it cannot be seen. Without
+ * script, with reduced motion, or if the script never starts (html[data-surface-ready] is never set), nothing
+ * is held back: the failsafe shows every member after 3 s.
+ */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-surface]:not([data-up]) {
+    opacity: 0;
+    transform: translateY(1.25rem);
+    pointer-events: none;
+  }
+  html:not([data-surface-ready]) [data-surface]:not([data-up]) {
+    animation: surface-failsafe 1ms 3s both;
+  }
+}
+@keyframes surface-failsafe {
+  to {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}

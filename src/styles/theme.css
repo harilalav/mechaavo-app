@@ -1,7 +1,9 @@
 /*
  * MECHAAVO — COLOR SOURCE OF TRUTH
  *
- * These eight tokens are the ONLY approved colors for the website.
+ * These twelve tokens are the ONLY approved colors for the website: the
+ * client's eight, plus four (2026-10-15, client review) that are for the
+ * water and the fish only and never for text or controls (lint `sea-scope`).
  * This is the only file in the project allowed to contain raw color values.
  *
  * - Do not add colors, shades, or tints here.
@@ -20,4 +22,15 @@
 
   --color-accent-primary: #00b2ff;
   --color-accent-secondary: #31ccef;
+
+  /*
+   * water and fish only (D12). The sea is the client's reference photo of the ocean
+   * (2026-10-15): light azure where the sun reaches it, the azure that most of it is,
+   * and the navy of the deep. These three are a first read of the photo by eye; lock
+   * them with `node docs/sample-ocean.mjs <the photo>`. The fish are the logo's own blue.
+   */
+  --color-sea-shallow: #4bb7e4;
+  --color-sea-mid: #1c8ccb;
+  --color-sea-deep: #0b2f6e;
+  --color-brand-blue: #2874e4;
 }

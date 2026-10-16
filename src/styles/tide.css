@@ -6,8 +6,9 @@
  * ink dipped in the water, a gradient from --color-dark toward --color-primary
  * whose blue stop lies past the end of the letter, so the baseline only gets
  * about half way (5.7:1 there, 16:1 at the top). Colour comes in around them too:
- *   - the plate behind the payoff word, a gradient from --color-primary to
- *     --color-accent-secondary, with ink text on it (8 to 10:1)
+ *   - the plate behind the payoff word: an ink label, white type, one accent edge
+ *     (--plate-bg, --plate-ink, --plate-edge; 18:1 for the type, 12:1 and better
+ *     against every ground the site has)
  *   - the drop that replaces the full stop, and the ripples it sends out
  *   - a glint of light that crosses the plate once it has landed
  *
@@ -29,6 +30,18 @@
 /* how far the plate leans; on :root because the button plates (tide-button.css) and the tile names lean the same way outside a heading */
 :root {
   --tide-skew: -9deg;
+  /*
+   * The plate behind a heading's payoff word: an ink label with white type and one accent edge.
+   * (Client review 2026-10-15, checked against the taste and ui-ux-pro-max rules: the old plate was a
+   * gradient between two almost identical fully saturated cyans, which read as flat neon and, on the
+   * new azure water, was the same hue as its ground and dissolved into it. Ink separates from every
+   * ground the site has, the water, the white page and the gray band, at 12:1 or better, and the
+   * single cyan edge is the one accent used with restraint.) One place to tune it; the buttons'
+   * hover plate (tide-button.css) is its own, cyan, state.
+   */
+  --plate-bg: var(--ink);
+  --plate-ink: var(--page);
+  --plate-edge: var(--accent);
 }
 
 /* an explicit line, like the hero's */
@@ -86,8 +99,8 @@
   padding-inline: 0.16em;
   margin-inline: -0.04em;
   white-space: nowrap;
-  /* ink on the plate, whatever the line around it is set in (and no browser-default yellow behind it) */
-  color: var(--ink);
+  /* white on the ink plate, whatever the line around it is set in (and no browser-default yellow behind it) */
+  color: var(--plate-ink);
   -webkit-text-fill-color: currentColor;
   background: none;
 }
@@ -104,7 +117,11 @@
   inset: 0.07em 0 0.01em;
   z-index: -1;
   overflow: hidden;
-  background: linear-gradient(100deg, var(--color-primary) 0%, var(--color-accent-secondary) 100%);
+  background: var(--plate-bg);
+  /* the accent edge along the foot, and a tinted lift (no glow) so the label sits on the page */
+  box-shadow:
+    inset 0 -0.06em 0 var(--plate-edge),
+    0 0.1em 0.3em -0.1em color-mix(in srgb, var(--color-dark) 42%, transparent);
   transform: skewX(var(--tide-skew));
   transform-origin: 0 50%;
 }

@@ -29,4 +29,11 @@
   /* the one accent: actions, focus, highlights */
   --accent: var(--color-primary);
   --on-accent: var(--color-dark);
+
+  /* environment, never text or controls (D12, lint `sea-scope`): the sea every
+     water layer is graded with (sunlit, the body of it, the deep), and the fish */
+  --water: var(--color-sea-shallow);
+  --water-mid: var(--color-sea-mid);
+  --water-deep: var(--color-sea-deep);
+  --fish: var(--color-brand-blue);
 }

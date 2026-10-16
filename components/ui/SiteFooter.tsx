@@ -29,7 +29,7 @@ export function SiteFooter() {
     (s): s is typeof s & { href: string } => s.href !== null,
   );
   return (
-    <footer className="relative isolate overflow-hidden bg-page pt-20 pb-10 md:pt-28">
+    <footer className="relative isolate overflow-hidden bg-page pt-[var(--section-y)] pb-10">
       <WaterLight variant="bottom" />
       <div className="page-container">
         <div className="flex flex-col gap-10 md:flex-row md:items-end md:justify-between">
@@ -61,7 +61,7 @@ export function SiteFooter() {
           )}
         </div>
 
-        <p className="mt-14 border-t border-line pt-6 text-sm text-ink-muted">
+        <p className="mt-10 border-t border-line pt-6 text-sm text-ink-muted">
           &copy; {new Date().getFullYear()} Mechaavo Tackles. All rights reserved.
         </p>
       </div>

@@ -8,7 +8,10 @@
 @import "../src/styles/section-jump.css";
 @import "../src/styles/site-nav.css";
 @import "../src/styles/categories.css";
+@import "../src/styles/categories-plate.css";
+@import "../src/styles/categories-inspector.css";
 @import "../src/styles/contact.css";
+@import "../src/styles/surface.css";
 @import "../src/styles/underwater.css";
 
 /*
@@ -75,20 +78,34 @@
 
 @layer base {
   :root {
-    /* page layout: one column width and gutter for every section */
-    --page-max: 1600px;
+    /* page layout: one column width and gutter for every section (rem, so a 4K screen's larger root widens it) */
+    --page-max: 100rem;
     --page-pad: clamp(1.25rem, 6vw, 6.5rem);
+    /*
+     * Vertical rhythm (VISUAL_DENSITY 4, client review 2026-10-15: too much blank space
+     * between sections): one padding for every section's top and bottom, and one gap
+     * between the blocks inside a section. 56 px on a phone, about 69 on a tablet,
+     * 85 on a laptop, 96 from 1792 px; with the root, 144 on a 4K screen.
+     */
+    --section-y: clamp(3.5rem, 2.75rem + 3vw, 6rem);
+    --block-gap: clamp(2rem, 1.5rem + 2vw, 3.5rem);
+    /* the sticky bar's height (site-nav.css): anchors and focus scroll clear of it */
+    --bar-h: 4rem;
     /* the one easing curve for UI motion */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    /* for light and shadow fading in or out (a plate's edge and shadow): ease-out starts at full speed, which
+       makes a fade pop; this one eases in as well (D15) */
+    --ease-fade: cubic-bezier(0.4, 0, 0.2, 1);
     /*
      * Page-level layers, back to front: the sheet that curtains over the hero, the
-     * dialogs, the veil a jump to a section dips through, the sticky nav bar (above the
-     * veil, so it stays put while the content dips), the skip link. The hero (--z-* in underwater.css), the catalog (--cat-z-*)
+     * veil a jump to a section dips through, the sticky nav bar (above the veil, so it
+     * stays put while the content dips), the dialogs (above the bar: the inspector is
+     * portalled to the body and covers the whole page, bar included), the skip link. The hero (--z-* in underwater.css), the catalog (--cat-z-*)
      * and the story media keep scales of their own inside their stacking contexts.
      * A z-index is always one of these names, never a number (design:lint z-literal).
      */
     --z-sheet: 1;
-    --z-modal: 100;
+    --z-modal: 700;
     --z-veil: 500;
     --z-bar: 600;
     --z-skip: 1000;
@@ -97,6 +114,21 @@
   html {
     color-scheme: light;
     background-color: var(--page);
+    /*
+     * Big screens get a bigger root, so type, spacing and the column grow together
+     * instead of a desktop page floating in white on a 4K monitor: 16px up to 1920 px
+     * wide, then 1px more per 240 px (24px at 3840), never past 150%. The 100% floor
+     * keeps the reader's own text size; at 200% zoom a 4K screen is 1920 CSS px wide,
+     * so nothing doubles up.
+     */
+    font-size: clamp(100%, 100% - 0.5rem + 0.4167vw, 150%);
+    /* a jump to a section, or a Tab to something near the top, lands below the sticky bar */
+    scroll-padding-top: var(--bar-h);
+  }
+  @media (max-height: 34rem) {
+    :root {
+      --bar-h: 3.25rem;
+    }
   }
 
   body {
@@ -157,6 +189,14 @@
     width: min(100%, var(--page-max));
     margin-inline: auto;
     padding-inline: var(--page-pad);
+  }
+
+  /* the section rhythm (--section-y) and the gap between blocks inside a section */
+  .section-y {
+    padding-block: var(--section-y);
+  }
+  .block-y {
+    padding-block: var(--block-gap);
   }
 
   /*

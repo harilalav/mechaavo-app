@@ -75,6 +75,22 @@
   transform: translateX(-140%);
 }
 
+/*
+ * The nav's links and menu buttons (the hero's and the sticky bar's: one nav in two states) wear the heading's ink
+ * plate, white label on ink, not the buttons' cyan one. The hero nav sits on the water, whose azure is the cyan
+ * plate's own colour, so its hover was lost on it (client round 3: "the nav blends with the background, the hover
+ * animation is not that visible"); ink stands off every ground the nav has, water, white and the pale azure, at
+ * 9 to 18:1, and keeps the accent along its foot like the heading plate. The wipe, the glint and the timings are
+ * the same.
+ */
+:is(.hero-nav, .site-nav) .tide-btn {
+  --on-plate: var(--plate-ink);
+}
+:is(.hero-nav, .site-nav) .tide-btn::before {
+  background: var(--plate-bg);
+  box-shadow: inset 0 -0.14em 0 var(--plate-edge);
+}
+
 /* keyboard focus, a press, and (on a menu button) the open state: always. A pointer passing over: only where hover exists. */
 .tide-btn:is(:focus-visible, :active, [aria-expanded="true"]) {
   color: var(--on-plate, var(--ink));

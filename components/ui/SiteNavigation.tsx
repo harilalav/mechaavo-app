@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { handoverLine } from "@/lib/utils/handoverLine";
 import { ListIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { SECTION_IDS, SITE_NAV_LINKS } from "@/lib/config/sections";
@@ -8,11 +9,15 @@ import { useMenuDismiss } from "@/lib/hooks/useMenuDismiss";
 
 /**
  * The hero nav's second state: a slim bar fixed to the top once the reader is past the
- * hero and the categories card, so the way to every section is never a scroll back up.
- * It slides in when #story reaches the top of the screen and out again when it leaves,
- * and steps aside while the hero (its own nav) or the full-screen categories stage (it
- * would cover the catalog's header) is on screen. Hidden, it is `inert`: out of the tab
- * order and the accessibility tree, so only one nav is ever exposed.
+ * hero, so the way to every section is never a scroll back up. It slides in when the
+ * categories section (rising over the pinned hero) reaches the handover line (handoverLine.ts: about
+ * two thirds of the way up the screen), and out again when it leaves: over the hero the hero's own nav is
+ * there. Hidden, it is `inert`: out of the tab order and the accessibility tree, and the
+ * hero turns `inert` on the same line (heroTimeline.ts), so only one nav is ever exposed.
+ *
+ * The bar's line is its own height plus 2% of the screen: a jump to a section lands just
+ * below the bar (`scroll-padding-top: var(--bar-h)` in globals.css), and that has to count
+ * as past it.
  *
  * Fixed above the jump veil (--z-bar), so a jump dips the content while the bar stays put.
  * The same fold as the hero nav: inline links from 768 px, a Menu button below.
@@ -29,27 +34,47 @@ export function SiteNavigation() {
   const close = useCallback(() => setOpen(false), []);
   useMenuDismiss(open, close, barRef, buttonRef);
 
-  // Past the start of #story? A thin strip along the top edge (2% of the screen) is the
-  // observer's root. The three story sections and the contact section tile the page from #story to
-  // its end (the footer is shorter than the screen, so the strip never lies in it), so one of them
-  // is always in the strip once #story's top has reached it. Any change of who is in the strip
-  // re-reads where #story is: a jump straight from the hero to #principles never has #story itself
-  // cross the strip, which is why it is not the one observed.
+  // Past the bar's line? A strip along the top edge, as tall as the line, is the observer's root.
+  // The sections from #categories on tile the page to its end (the footer is shorter than the
+  // screen, so the strip never lies in it), so one of them is always in the strip once the
+  // categories' top has reached it. Any change of who is in the strip re-reads where the
+  // categories are: a jump straight from the hero to #principles never has #categories itself
+  // cross the strip, which is why it is not the only one observed.
   useEffect(() => {
-    const story = document.getElementById(SECTION_IDS.story);
-    const sections = [SECTION_IDS.story, SECTION_IDS.principles, SECTION_IDS.commitment, SECTION_IDS.contact]
+    const first = document.getElementById(SECTION_IDS.categories) ?? document.getElementById(SECTION_IDS.story);
+    const sections = [
+      SECTION_IDS.categories,
+      SECTION_IDS.story,
+      SECTION_IDS.principles,
+      SECTION_IDS.commitment,
+      SECTION_IDS.contact,
+    ]
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => el !== null);
-    if (!story || !("IntersectionObserver" in window)) return;
+    if (!first || !("IntersectionObserver" in window)) return;
 
+    const line = () => handoverLine(barRef.current);
     const update = () => {
-      const past = story.getBoundingClientRect().top <= window.innerHeight * 0.02;
+      const past = first.getBoundingClientRect().top <= line();
       setShown(past);
       if (!past) setOpen(false);
     };
-    const observer = new IntersectionObserver(update, { rootMargin: "0px 0px -98% 0px" });
-    sections.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+
+    let observer: IntersectionObserver | undefined;
+    const watch = () => {
+      observer?.disconnect();
+      observer = new IntersectionObserver(update, {
+        rootMargin: `0px 0px -${Math.max(0, Math.round(window.innerHeight - line()))}px 0px`,
+      });
+      sections.forEach((el) => observer?.observe(el));
+    };
+    watch();
+    // the strip is in pixels, so it follows the window's height
+    window.addEventListener("resize", watch);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", watch);
+    };
   }, []);
 
   return (
