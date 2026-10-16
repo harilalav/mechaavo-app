@@ -33,8 +33,8 @@ export type FishState =
  * the hero.
  *
  * The story is 1.9 screens of scroll long on a landscape layout and 1.5 on a stacked one
- * (`--hero-screens` in src/styles/underwater.css minus the hero's own screen and the
- * curtain's). Every beat is a share of it, so the bite lands the same distance down the
+ * (`--hero-screens` in src/styles/underwater.css minus two screens: the hero's own, and the
+ * one the catalog rises over it in). Every beat is a share of it, so the bite lands the same distance down the
  * page on both (about 0.6 screens, plus the scrub's lag): these are the numbers of the
  * earlier 4.1-screen story, scaled by 2.15, so the approved bite did not move. Anything
  * after the bite is measured in screens from it: sweep gate G16 (scripts/design-sweep.mjs)
@@ -101,7 +101,19 @@ export interface HeroScene {
    * toward the target), so a fast scroll still shows the fish being lifted out.
    */
   reel: number;
-  /** True once the next section has slid fully over the hero: nothing here is visible, so the engine rests. */
+  /**
+   * True once the categories have come up over the hero to the sticky bar's line. The hero is a live backdrop
+   * behind the catalog from then on (it is no longer covered by a sheet: the plates rise through its water), so
+   * the engine keeps running but cheaply: fewer frames, and the catch (the hooked fish, the line, its bubbles)
+   * eases out of the picture.
+   */
+  backdrop: boolean;
+  /**
+   * 0-1: how far the camera has sunk below the catch while the catalog rises through the water (the catalog's
+   * own scroll trigger in heroTimeline.ts). The engine adds it to `descend`.
+   */
+  sink: number;
+  /** True once the story section has come up over the whole hero (the catalog has ended): nothing of it shows, so the engine rests. */
   covered: boolean;
   /** True when the user prefers reduced motion (engine renders a still). */
   reduced: boolean;
@@ -119,6 +131,8 @@ export function createHeroScene(): HeroScene {
     statement: 0,
     lead: 0,
     reel: 0,
+    backdrop: false,
+    sink: 0,
     covered: false,
     reduced: false,
   };

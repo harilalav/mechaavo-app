@@ -33,19 +33,19 @@
   --z-lure: 4;
   --z-copy: 5;
   --z-front: 6;
+  /* the deeper water the camera sinks into under the catalog: over the fish, under the words */
+  --z-depth: 7;
   --z-statement: 8;
   --z-captions: 9;
   --z-nav: 10;
 
   /*
-   * The hero is stuck to the top of the screen while the story plays out over
-   * the scroll distance of its track (.hero-track). The next section is pulled
-   * up over it like a curtain (.story-sheet), so the scene is never replaced by
-   * a blank screen: the catch, the statement and the water stay in view until
-   * the page's own ground rises over them.
+   * With script and motion allowed the hero is stuck to the top of the screen (see the layout section at the
+   * end) while the story plays out over its track's spacer, and then while the categories scroll up over it:
+   * the hero is their live backdrop, the plates rise through its water (client review 2026-10-16; there is no
+   * sheet sliding over it any more). Without script or with reduced motion it is one still screen in the flow.
    */
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 100svh;
   overflow: hidden;
   isolation: isolate;
@@ -59,10 +59,9 @@
  * stays full-bleed. No stacking context here: children join the hero's z-scale.
  */
 /*
- * The scroll distance the hero's story plays over. By default it is just the
- * hero; with scripting and motion allowed it is several screens tall (set in
- * the layout section at the end), and the hero sticks inside it. The story
- * section that follows overlaps the last screen of it.
+ * The hero's track: the hero, the spacer its story is scrubbed over, and the categories after it (rendered
+ * inside, MechaavoHero's children). The hero sticks inside it, so it stays pinned until the end of the
+ * catalog. The spacer only has a height with script and motion allowed (the layout section at the end).
  */
 .hero-track {
   position: relative;
@@ -146,7 +145,19 @@
 
 /* ————————————————————————— water & light ————————————————————————— */
 
-/* Water column. The root is --page (white); everything here is a translucent tint on it. */
+/*
+ * Water column (D12): the client's reference ocean (2026-10-15). Light azure where the
+ * sun reaches it, the azure that most of the sea is, navy in the deep. An opaque column of
+ * water, not a tint on the white page, so the colour is the photo's: saturated azure and
+ * navy.
+ *
+ * Copy stays readable by LIGHT, not by muting the sea. The sun comes down at the upper
+ * left, where the nav, kicker and headline sit, and a second pool of light lies behind
+ * the lede and the call to action (ink is 8 to 10:1 on it; the lede in ink-soft stays
+ * above 8:1 and the call to action's blue keeps a pale ground). The sea itself gets its
+ * depth to the right and below, where the fish fight, and the seabed on the left is lit
+ * for the captions (seabed.ts).
+ */
 .hero-bg {
   position: absolute;
   inset: 0;
@@ -155,23 +166,63 @@
   background:
     /* sun glare arriving from the surface, upper left */
     radial-gradient(
-      ellipse 72% 48% at 28% -10%,
-      color-mix(in srgb, var(--color-white) 95%, transparent),
+      ellipse 70% 50% at 24% -8%,
+      color-mix(in srgb, var(--color-white) 96%, transparent),
       transparent 74%
     ),
-    /* luminous cyan pool around the lure: the one place the accent shows in the water */
+    /* the pool of light behind the copy column */
     radial-gradient(
-      ellipse 52% 58% at 66% 50%,
-      color-mix(in srgb, var(--color-accent-secondary) 17%, transparent),
+      ellipse 50% 64% at 12% 52%,
+      color-mix(in srgb, var(--color-white) 64%, transparent),
       transparent 72%
     ),
-    /* clear at the top, bluer with depth */
+    /* sunlit shallows low on the left, as in the reference: the captions sit on the seabed here, in ink */
+    radial-gradient(
+      ellipse 72% 52% at 0% 108%,
+      color-mix(in srgb, var(--water) 48%, var(--color-white)),
+      transparent 80%
+    ),
+    /* the deep: navy gathering on the right and low, as in the reference */
+    radial-gradient(
+      ellipse 58% 78% at 106% 64%,
+      color-mix(in srgb, var(--water-deep) 78%, transparent),
+      transparent 70%
+    ),
+    /* sunlit azure around the lure */
+    radial-gradient(
+      ellipse 46% 52% at 62% 38%,
+      color-mix(in srgb, var(--water) 55%, transparent),
+      transparent 72%
+    ),
+    /* the column: bright at the surface, azure through the body of the sea, blue-navy at the bottom */
+    linear-gradient(
+      172deg,
+      color-mix(in srgb, var(--water) 58%, var(--color-white)) 0%,
+      var(--water) 24%,
+      var(--water-mid) 58%,
+      color-mix(in srgb, var(--water-mid) 52%, var(--water-deep)) 100%
+    );
+}
+
+/*
+ * The deeper water the camera sinks into while the catalog rises through the hero (heroTimeline.ts writes
+ * its opacity, 0 to 0.92, over the second quarter of the sink). It is what the catalog's white heading is read on
+ * (3:1 for the large words, 4.5:1 for the lede, the e2e pixel test), so it is deep everywhere.
+ */
+.hero-depth {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-depth);
+  pointer-events: none;
+  opacity: 0;
+  /* deep from the top to the bottom (the heading's white type has to be readable on it wherever it passes), a
+     little lighter at the top, where the sun still reaches; the right and the lower left run deepest */
+  background:
+    radial-gradient(ellipse 80% 70% at 100% 100%, color-mix(in srgb, var(--water-deep) 90%, transparent), transparent 80%),
     linear-gradient(
       to bottom,
-      transparent 0%,
-      color-mix(in srgb, var(--color-primary) 9%, transparent) 36%,
-      color-mix(in srgb, var(--color-primary) 20%, transparent) 70%,
-      color-mix(in srgb, var(--color-primary) 30%, transparent) 100%
+      color-mix(in srgb, var(--water-mid) 52%, var(--water-deep)) 0%,
+      var(--water-deep) 100%
     );
 }
 
@@ -180,6 +231,9 @@
   inset: 0;
   z-index: var(--z-light);
   pointer-events: none;
+  /* the pointer's parallax (heroTimeline.ts sets --ray-shift): the individual `translate` property, so it does not fight the timeline's own transform on this layer */
+  translate: var(--ray-shift, 0px) 0;
+  transition: translate 900ms var(--ease-out);
 }
 
 .hero-ray {
@@ -220,11 +274,54 @@
   will-change: transform, opacity;
 }
 
+/*
+ * A glint that runs down each shaft: the light moving through the water, so the shafts are not flat
+ * stripes. One narrow bright band per shaft, travelling top to bottom and fading at both ends, on its own
+ * period and phase (--ray-i). Transform and opacity only, under the shaft's own clip and mask, and off
+ * with reduced motion and in lite mode.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-ray__beam::after {
+    content: "";
+    position: absolute;
+    inset: 0 18% auto;
+    height: 24%;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      color-mix(in srgb, var(--color-white) 78%, transparent) 50%,
+      transparent
+    );
+    opacity: 0;
+    animation: hero-ray-glint calc(7s + var(--ray-i, 0) * 1.9s) ease-in-out calc(var(--ray-i, 0) * -2.6s) infinite;
+    will-change: transform, opacity;
+  }
+  .hero-root[data-lite] .hero-ray__beam::after {
+    animation: none;
+  }
+}
+@keyframes hero-ray-glint {
+  0% {
+    transform: translateY(-30%);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.85;
+  }
+  72% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(340%);
+    opacity: 0;
+  }
+}
+
 .hero-ray--accent .hero-ray__beam {
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--color-accent-secondary) var(--ray-a), transparent) 0%,
-    color-mix(in srgb, var(--color-accent-secondary) calc(var(--ray-a) * 0.6), transparent) 50%,
+    color-mix(in srgb, var(--water) var(--ray-a), transparent) 0%,
+    color-mix(in srgb, var(--water) calc(var(--ray-a) * 0.6), transparent) 50%,
     transparent 92%
   );
 }
@@ -257,9 +354,9 @@
   z-index: var(--z-back);
   pointer-events: none;
   background: radial-gradient(
-    ellipse 88% 80% at 58% 48%,
-    transparent 46%,
-    color-mix(in srgb, var(--color-primary) 22%, transparent) 100%
+    ellipse 90% 84% at 52% 42%,
+    transparent 50%,
+    color-mix(in srgb, var(--water-deep) 34%, transparent) 100%
   );
 }
 
@@ -296,7 +393,7 @@
   z-index: var(--z-lure);
   top: 0;
   left: 60%;
-  width: clamp(150px, 13vw, 205px);
+  width: clamp(9.375rem, 13vw, 12.8125rem);
   height: 100%;
   display: grid;
   place-items: center;
@@ -321,10 +418,17 @@
 @media (min-width: 1280px) {
   .hero-lure-slot {
     left: 61.5%;
-    width: clamp(160px, 12vw, 215px);
+    width: clamp(10rem, 12vw, 13.4375rem);
   }
 }
 
+/* the lure's fade wrapper: fills the slot and centres the lure as the slot did (heroTimeline.ts fades it) */
+.hero-lure-fade {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
 .hero-lure {
   width: 100%;
   will-change: transform;
@@ -415,17 +519,18 @@
   /* the light arrives a moment after the water, once the tile is ready */
   opacity: 0;
   transition: opacity 2.4s ease-out;
+  /* reaches well down the water now (it ended at 82% and faded from 30%): the light's lace is what makes the surface feel like a surface */
   -webkit-mask-image: linear-gradient(
     to bottom,
     var(--color-white) 0%,
-    var(--color-white) 30%,
-    transparent 82%
+    var(--color-white) 46%,
+    transparent 94%
   );
   mask-image: linear-gradient(
     to bottom,
     var(--color-white) 0%,
-    var(--color-white) 30%,
-    transparent 82%
+    var(--color-white) 46%,
+    transparent 94%
   );
 }
 :root[data-caustic] .hero-caustics {
@@ -442,15 +547,16 @@
   will-change: transform;
   animation: caustic-drift var(--drift) linear infinite;
 }
+/* the white lace of the client's ocean photo: veins of light, not a faint haze (they were 0.24 and 0.16 and drifted once in 46 and 61 s) */
 .hero-caustics__layer--a {
   --tile: 640px;
-  --drift: 46s;
-  opacity: 0.24;
+  --drift: 34s;
+  opacity: 0.46;
 }
 .hero-caustics__layer--b {
   --tile: 420px;
-  --drift: 61s;
-  opacity: 0.16;
+  --drift: 44s;
+  opacity: 0.3;
   animation-direction: reverse;
 }
 /* the light slides downstream with the current (toward the lure's tail) */
@@ -487,7 +593,9 @@
   font-weight: 600;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--ink-muted);
+  /* ink-soft, not the muted tone: the kicker sits on the sunlit edge of the ocean (azure, D12),
+     where muted ink read 2.9 to 3.2:1 and ink-soft is above 5.5:1 on even the lightest azure */
+  color: var(--ink-soft);
 }
 
 /* capped: past a 1600px column the headline would run into the lure */
@@ -611,14 +719,20 @@
 }
 /*
  * A soft wash of the page color behind the words keeps them legible over the
- * rays and the water; it fades in and out with the text.
+ * rays and the water; it fades in and out with the text. Both leave as the camera sinks under the catalog:
+ * heroTimeline.ts writes `--leave` on the slot (its own opacity is the catch's), read here and by the
+ * words' wrapper.
  */
+.hero-statement-fade {
+  opacity: var(--leave, 1);
+}
 .hero-statement-slot::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  opacity: var(--leave, 1);
   background: radial-gradient(
     ellipse 58% 62% at 16% 26%,
     color-mix(in srgb, var(--page) 78%, transparent),
@@ -725,6 +839,25 @@
   pointer-events: auto;
 }
 /*
+ * A veil of the page's light along the top of the water, behind the logo and the links and fading to nothing under
+ * them: the nav sits bare on the azure, and its small ink type blended with it (client round 3: "the nav bar
+ * blends with the background, it is not visible by default"). The same trick as the pools of light behind the
+ * copy, kept thin; the hero's own sun glare already does this at the left.
+ */
+.hero-nav::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 -1.2rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--page) 58%, transparent) 0%,
+    color-mix(in srgb, var(--page) 30%, transparent) 55%,
+    transparent 100%
+  );
+}
+/*
  * Wide enough that the thin MECHAAVO wordmark under the waves stays readable, narrow
  * enough that the bar (the lockup plus its padding) is never taller than 80px: 128px
  * wide is a 66px lockup and a 79px bar.
@@ -788,10 +921,11 @@
   min-height: 48px;
   padding: 0 1rem;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  /* full ink on the water (ink-soft read as grey on it) */
+  color: var(--ink);
 }
 
 /*
@@ -877,6 +1011,28 @@
   bottom: clamp(1.4rem, 5svh, 3rem);
   pointer-events: none;
 }
+/*
+ * A pool of light behind the captions. They are 12px ink on the seabed, which rises and
+ * darkens as the camera sinks, so their ground moved between 3.9 and 5.8:1 over the story.
+ * The light is part of the scene (sun reaching the shallows on the left), and it keeps the
+ * ground under the words pale wherever the seabed is. The container has no box of its own
+ * (its captions are absolute), so the pool is sized here.
+ */
+.hero-captions::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -5rem;
+  bottom: -2.4rem;
+  width: min(30rem, 96vw);
+  height: 7.4rem;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 50% 50% at 50% 54%,
+    color-mix(in srgb, var(--color-white) 64%, transparent),
+    transparent 100%
+  );
+}
 .hero-caption {
   position: absolute;
   left: 0;
@@ -909,7 +1065,7 @@
   /* lure below the copy, a touch below the middle; the hero fish swims in beside it */
   .hero-lure-slot {
     left: 38%;
-    width: clamp(130px, 28vw, 175px);
+    width: clamp(8.125rem, 28vw, 10.9375rem);
     padding-top: 16svh;
   }
   .hero-copy-slot {
@@ -965,7 +1121,7 @@
   }
   .hero-lure-slot {
     left: 35%;
-    width: clamp(140px, 24vw, 190px);
+    width: clamp(8.75rem, 24vw, 11.875rem);
     padding-top: 22svh;
   }
 }
@@ -1035,7 +1191,7 @@
 @media (max-height: 34rem) and (min-aspect-ratio: 1/1) {
   .hero-lure-slot {
     left: 60%;
-    width: clamp(150px, 13vw, 205px);
+    width: clamp(9.375rem, 13vw, 12.8125rem);
     padding-top: 0;
   }
 }
@@ -1099,31 +1255,53 @@
 }
 
 /*
- * The scroll distance of the hero's story (see .hero-track): the hero's own
- * screen, the story itself, and one more screen while the next section slides
- * up over it (.story-sheet is pulled up by exactly that screen). The story is 1.9
- * screens on a landscape layout and 1.5 on a stacked one: the bite lands about 0.6
- * of a screen down on both, the catch is drawn up a quarter of a screen later, and
- * the sheet follows soon after (the beats are STORY in lib/underwater/story.ts, and
- * the sweep's G16 fails when the scroll after the bite grows again). Only when script
- * can run the story and motion is allowed; otherwise the hero is one still
- * screen and the sections simply follow it. The timeline measures the track, so
- * these numbers are the only place the length is set (the story is 2 screens
- * shorter than the track).
+ * The hero's track, with script and motion allowed: the hero sticks (so it stays pinned through the story
+ * and then behind the catalog), and the spacer after it is the story's scroll distance. The categories
+ * follow the spacer inside the track (MechaavoHero's children), so their top lands where the old curtain's
+ * top was: the hero's screen plus the spacer = --hero-screens - 1 - --sheet-lead screens down, the bite and
+ * the reel do not move (STORY, client-approved), and the sweep's G16 budget is the same. The story is 1.9
+ * screens on a landscape layout and 1.5 on a stacked one (--hero-screens less two; the timeline reads it).
+ * --sheet-lead is the slow tail of the story after the catch is drawn up plus a fifth of a screen: the
+ * catalog's top comes up from below as the fish leaves the water.
+ *
+ * The track's own ground is the floor of the water: it only shows where the hero (exactly 100svh) is shorter
+ * than the screen, when a phone's toolbars hide, and a strip of the white page there read as a seam.
+ * Without script or with reduced motion none of this applies: the hero is one still screen in the flow.
  */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   .hero-track {
     --hero-screens: 3.9;
-    height: calc(100svh * var(--hero-screens));
+    /* the catalog's top comes up 0.3 of a screen after the bite (it was 0.5, client round 3: "too much scroll just
+       before the category list"), while the fish is being drawn up out of the top of the frame: the first row of
+       plates is complete about 0.93 of a screen after the bite on a laptop (it was 1.13) */
+    --sheet-lead: 0.75;
+    background-color: color-mix(in srgb, var(--water-mid) 52%, var(--water-deep));
+    /* given back after the tail (below): #story comes up over the tail's screen */
+    margin-bottom: -100svh;
   }
-  .story-sheet {
-    margin-top: -100svh;
+  /*
+   * One more screen at the track's end: a sticky element stays stuck only while its track's content can hold
+   * its whole height, so without it the hero would scroll away under the catalog's last screen. With it the
+   * hero stays pinned to the catalog's very end, and #story (which follows in the page, painted later, pulled
+   * up over this screen by the track's negative margin) comes up over it from there, opening on the pale azure
+   * the catalog's foot fades to. The page is no longer for it.
+   */
+  .hero-tail {
+    height: 100svh;
+  }
+  .hero-root {
+    position: sticky;
+    top: 0;
+  }
+  .hero-spacer {
+    height: calc(100svh * (var(--hero-screens) - 2 - var(--sheet-lead)));
   }
 }
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-width: 767px),
   (scripting: enabled) and (prefers-reduced-motion: no-preference) and (max-aspect-ratio: 1/1) {
   .hero-track {
     --hero-screens: 3.5;
+    --sheet-lead: 0.65;
   }
 }
 

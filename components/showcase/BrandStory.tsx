@@ -6,7 +6,6 @@ import {
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Tide } from "@/components/ui/Tide";
 import { SECTION_IDS } from "@/lib/config/sections";
-import { StoryVideo } from "./StoryVideo";
 import { WaterLight } from "./WaterLight";
 
 /** Each principle with the mark of what it stands for ([the word] wears the plate, see Tide). */
@@ -23,15 +22,15 @@ const statement =
   "max-w-xl text-xl font-medium leading-snug text-pretty text-ink md:text-2xl";
 
 /**
- * Where the hero lands: the Mechaavo story. The first section is a sheet that
- * slides up over the hero (see .story-sheet), and it opens with the water the
- * hero ends in (WaterLight), clearing into the white page, so the scene hands
- * over to the page instead of being cut off by a blank screen. Every section
+ * After the categories (which rise through the pinned hero's water and surface at their foot):
+ * the Mechaavo story. It comes up over the hero's last screen, and its first section opens with
+ * the pale water the categories end in (WaterLight), clearing into the white page, so the scene hands over to the
+ * page instead of being cut off by a blank screen. Every section
  * has water light of its own behind it. They share the hero's column
  * (.page-container) and headline voice (.display-type).
  *
  * Three sections, three layouts, each block at most 25 words:
- *   #story       headline and lead, the water footage, then what the name means
+ *   #story       headline and lead, then what the name means
  *   #principles  the three principles as large divided rows
  *   #commitment  who it is for, the promise, and the sign-off beside the logo
  */
@@ -40,7 +39,7 @@ export function BrandStory() {
     <>
       <section
         id={SECTION_IDS.story}
-        className="relative isolate overflow-hidden bg-page pt-24 md:pt-36 border-t border-line/40"
+        className="relative isolate overflow-hidden bg-page pt-[var(--section-y)] border-t border-line/40"
       >
         <WaterLight variant="top" />
         <div className="page-container">
@@ -52,18 +51,14 @@ export function BrandStory() {
             muted={[1]}
           />
 
-          <p className="mt-12 max-w-3xl text-2xl leading-snug font-medium text-balance text-ink md:mt-16 md:text-4xl md:leading-tight">
+          <p className="mt-8 max-w-3xl text-2xl leading-snug font-medium text-balance text-ink md:mt-12 md:text-4xl md:leading-tight">
             Mechaavo was born from a belief that exceptional design can transform
             ordinary experiences into extraordinary ones.
           </p>
         </div>
 
-        <div className="mt-16 md:mt-24">
-          <StoryVideo />
-        </div>
-
         <div className="page-container">
-          <div className="grid gap-10 py-16 md:py-24 lg:grid-cols-2 lg:gap-24">
+          <div className="grid gap-8 pt-[var(--block-gap)] pb-[var(--section-y)] lg:grid-cols-2 lg:gap-24">
             <p className={`${statement} border-t border-line pt-6`}>
               &ldquo;Mecha&rdquo; for mechanics, precision, and engineering. An
               ending for progress, movement, and evolution.
@@ -78,16 +73,17 @@ export function BrandStory() {
 
       <section
         id={SECTION_IDS.principles}
-        className="relative isolate overflow-hidden bg-page-alt py-24 md:py-36"
+        className="section-y relative isolate overflow-hidden bg-page-alt"
       >
         <WaterLight variant="soft" />
         <div className="page-container">
-          <p className={body}>
+          {/* the section's heading in the page outline, set as body text (the principles below are the display type) */}
+          <h2 className={body}>
             Every Mechaavo product is created with three principles:
-          </p>
-          <ul className="mt-8 divide-y divide-line border-y border-line">
+          </h2>
+          <ul data-surface-group="" className="mt-8 divide-y divide-line border-y border-line">
             {PRINCIPLES.map(({ text, Icon }) => (
-              <li key={text} className="principle group py-8 md:py-12">
+              <li key={text} data-surface="" className="principle group py-6 md:py-8">
                 <Tide
                   as="span"
                   className="block text-3xl font-bold tracking-tight text-ink transition-transform duration-500 ease-[var(--ease-out)] group-hover:translate-x-3 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0 md:text-6xl"
@@ -105,7 +101,7 @@ export function BrandStory() {
 
       <section
         id={SECTION_IDS.commitment}
-        className="relative isolate overflow-hidden bg-page py-24 md:py-36"
+        className="section-y relative isolate overflow-hidden bg-page"
       >
         <div className="page-container">
           {/* a vertical stack, not the two columns the story section uses: each section keeps its own layout */}
@@ -120,10 +116,10 @@ export function BrandStory() {
             </p>
           </div>
 
-          <div className="mt-24 grid gap-16 border-t border-line pt-16 md:mt-32 lg:grid-cols-12 lg:items-end">
+          <div className="mt-[var(--block-gap)] grid gap-10 border-t border-line pt-[var(--block-gap)] lg:grid-cols-12 lg:items-end">
             <div className="lg:col-span-7">
               <Tide
-                as="h3"
+                as="h2"
                 className="display-type text-3xl md:text-5xl"
                 text="Mechaavo is more than a [brand]."
                 drop
@@ -132,7 +128,7 @@ export function BrandStory() {
                 A commitment to products that last longer, perform better, and
                 inspire confidence, today and for generations to come.
               </p>
-              <p className="mt-12 text-xl font-semibold text-ink">
+              <p className="mt-8 text-xl font-semibold text-ink">
                 Every detail engineered. Every product trusted.
               </p>
             </div>
