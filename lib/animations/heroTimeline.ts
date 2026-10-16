@@ -119,6 +119,15 @@ const span = (from: number, length: number): number => at(from + length) - at(fr
 
 let pluginsRegistered = false;
 
+/** The catalog's snap can be switched off from outside (tests, measurements): localStorage `mechaavo-snap` = "off". */
+function snapIsOff(): boolean {
+  try {
+    return window.localStorage.getItem("mechaavo-snap") === "off";
+  } catch {
+    return false;
+  }
+}
+
 export function createHeroTimeline({ root, track, scene, stacked }: HeroTimelineOptions): () => void {
   if (!pluginsRegistered) {
     gsap.registerPlugin(ScrollTrigger);
@@ -224,6 +233,36 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
         scene.backdrop = self.isActive;
         // and nothing behind the catalog takes focus or clicks (the hero nav, the call to action)
         root.toggleAttribute("inert", self.isActive);
+      },
+    });
+  }
+
+  // ———————————————————————— the catalog hooks to the top ————————————————————————
+  // While the catalog's top travels up the screen (from its bottom edge to the line an anchor jump lands it on,
+  // just under the sticky bar) a reader who stops there is left with a screen of empty water above a heading
+  // (client review 2026-10-16: "when we scroll to the categories it should hook automatically to the top of the
+  // screen and show full content"). Once the scroll has rested, the page settles the catalog under the bar. Going
+  // down it always completes the move; going up it takes the nearer end (the catalog's top at the bottom edge is
+  // the hero's finished scene: the catch drawn up, the statement). Inside the catalog nothing snaps (the trigger
+  // ends where the catalog's top meets the bar), and the jumps (sectionJump.ts) already land on that line. Touch and
+  // wheel interrupt it. Not built under reduced motion or without script (this timeline is not), where the page just
+  // scrolls. localStorage `mechaavo-snap` = "off" is the switch for tests and measurements that park the page on purpose.
+  if (sheet) {
+    const barHeight = () => Math.round(document.querySelector<HTMLElement>(".site-nav")?.offsetHeight ?? 0);
+    ScrollTrigger.create({
+      trigger: sheet,
+      start: "top bottom",
+      end: () => `top ${barHeight()}px`,
+      invalidateOnRefresh: true,
+      snap: {
+        snapTo: (progress, self) => {
+          if (snapIsOff()) return progress;
+          return (self?.direction ?? 1) > 0 || progress > 0.5 ? 1 : 0;
+        },
+        delay: 0.3,
+        duration: { min: 0.25, max: 0.6 },
+        ease: "power2.out",
+        inertia: false,
       },
     });
   }
