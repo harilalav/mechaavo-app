@@ -41,7 +41,10 @@ export function HeroCopy() {
               </span>
               <span className="hero-line">
                 <span className="hero-line__inner" data-hero="title-inner">
-                  for every <Mark>cast</Mark>
+                  for every{" "}
+                  <Mark>
+                    <span className="tide__t">cast</span>
+                  </Mark>
                   <Drop />
                 </span>
               </span>
@@ -77,7 +80,9 @@ export function HeroCopy() {
                 <span className="hero-line__inner" style={{ "--i": i } as CSSProperties}>
                   {i === STATEMENT.length - 1 ? (
                     <>
-                      <Mark>{word}</Mark>
+                      <Mark>
+                        <span className="tide__t">{word}</span>
+                      </Mark>
                       <Drop />
                     </>
                   ) : (
