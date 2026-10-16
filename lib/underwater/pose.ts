@@ -90,7 +90,11 @@ export function settleFacing(fish: Fish, dt: number): void {
 /**
  * Tail beat in step with swimming: frequency rises with speed in body lengths
  * per second (fast fish beat fast, gliding fish barely at all), amplitude with
- * effort. Small baitfish beat faster than big fish at the same relative speed.
+ * effort. Small baitfish beat faster than big fish at the same relative speed, but never faster than
+ * the picture can show: the engine draws the water behind the catalog every 32 to 48 ms, and a tail
+ * that turns more than about 1.5 radians between two drawn frames (9 Hz at 48 ms) stops reading as a beat
+ * and flickers (client review 2026-10-16: "the small fish are not having natural movement"), so the
+ * baitfish top out near 5 Hz.
  */
 export function beatTail(
   fish: Fish,
@@ -100,7 +104,7 @@ export function beatTail(
   ampScale = 1,
 ): void {
   const bl = Math.min(bodyLengthsPerSecond, 3);
-  const base = fish.species === "bait" ? 3.2 + 2.0 * bl : 0.9 + 1.3 * bl;
+  const base = fish.species === "bait" ? 2.6 + 0.85 * bl : 0.9 + 1.3 * bl;
   fish.tailFreq = base * freqScale;
   fish.tailAmp = clamp(0.6 + 0.28 * Math.min(bl, 1.6), 0.6, 1.1) * ampScale;
   fish.tailPhase += TAU * fish.tailFreq * dt;

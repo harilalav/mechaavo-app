@@ -216,6 +216,8 @@ function configureLane(
   fish.facing = lane.dir;
   fish.turn = 1;
   fish.pitch = 0;
+  // no two fish beat their tails in step: every blank fish starts its beat at 0
+  if (initial) fish.tailPhase = range(rng, 0, TAU);
   fish.prevX = fish.x;
   fish.prevY = fish.y;
   fish.placed = false;
@@ -378,6 +380,7 @@ function createSchool(
     fish.scale = leader.scale * range(rng, 0.88, 1.18);
     fish.depth = leader.depth;
     fish.opacity = range(rng, 0.65, 0.85);
+    fish.tailPhase = range(rng, 0, TAU);
     fish.member = {
       school: index,
       offX: range(rng, -5, 3),
@@ -407,10 +410,12 @@ function configureBaitLane(
 
   lane.dir = rng() < 0.5 ? 1 : -1;
   lane.speedBL = range(rng, 2.0, 2.8);
-  lane.bobAmp = range(rng, 0.8, 1.6); // baitfish weave in whole lengths
-  lane.bobWave = range(rng, 14, 24);
+  // a school cruises nearly level and weaves gently, in lengths: wider and it snakes up and down the screen with
+  // every fish nosing up and down at the pitch limit (the first tuning: 0.8 to 1.6 and 1.5 to 3.5)
+  lane.bobAmp = range(rng, 0.25, 0.5);
+  lane.bobWave = range(rng, 18, 30);
   lane.bobPhase = range(rng, 0, TAU);
-  lane.driftAmp = range(rng, 1.5, 3.5);
+  lane.driftAmp = range(rng, 1, 2);
   lane.driftFreq = range(rng, 0.15, 0.3);
   lane.driftPhase = range(rng, 0, TAU);
   lane.kick = 0;
@@ -492,10 +497,16 @@ function updateSchool(
 
     fish.depth = clamp(leader.depth + m.offZ * 0.05, 0.05, 0.5);
     fish.yaw = (dir > 0 ? 0 : Math.PI) + 0.12 * wobble(time * 0.7, m.phase);
-    const pitch = clamp(Math.atan2(-vy, Math.max(Math.abs(vx), 20)), -0.5, 0.5);
-    fish.pitch = fish.placed ? damp(fish.pitch, pitch, 6, dt) : 0;
-    fish.speed = Math.hypot(vx, vy) + leader.speed * 0.5;
-    beatTail(fish, dt, fish.speed / Math.max(length, 1));
+    // a fish noses along its path, but less than the path climbs (a body pitches a little less than the water it
+    // crosses): the slope of its own motion against the school's cruise (never a near-zero run, which made a small
+    // vertical drift a steep climb), at about half, and never past the lane fish's natural angle
+    const slope = Math.atan2(-vy, Math.max(Math.abs(vx), 0.6 * leader.speed, 20));
+    const pitch = clamp(0.55 * slope, -PITCH_LANE, PITCH_LANE);
+    fish.pitch = fish.placed ? damp(fish.pitch, pitch, 3.5, dt) : 0;
+    // its tail beats to its own swimming speed (it used to be that plus half the leader's again, which pinned every
+    // tail at the top of the range), a little differently for each fish, so the school never beats in step
+    fish.speed = vx !== 0 || vy !== 0 ? Math.hypot(vx, vy) : leader.speed;
+    beatTail(fish, dt, fish.speed / Math.max(length, 1), 1 + 0.12 * Math.sin(m.phase * 7.3));
     fish.glint = Math.max(0, Math.sin(time * (1.5 + (m.phase % 1)) + m.phase * 3)) ** 6;
     settleFacing(fish, dt);
     fish.placed = true;
