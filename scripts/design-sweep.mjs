@@ -69,7 +69,7 @@ const SCREENS = [
 const GATES = {
   G1: "no horizontal overflow",
   G2: "nav: one line, at most 80 px, logo inside",
-  G3: "fit: hero, statement, catalog and dialog fit the screen",
+  G3: "fit: hero, statement and dialog fit the screen, the catalog never scrolls inside itself",
   G4: "targets: 44 px touch / 24 px pointer, 8 px apart on touch",
   G5: "text floors: 12 labels, 14 secondary, 16 running",
   G6: "no clipped text",
@@ -81,14 +81,14 @@ const GATES = {
   G12: "one h1, no skipped heading level",
   G13: "eyebrow budget ceil(sections / 3)",
   G14: "left edges on the column edge",
-  G15: "media: sized, alt, poster and pause, canvases inert",
-  G16: "scroll budget: bite to lift, bite to the categories, categories to the catalog",
-  G17: "catalog: no scroller inside the card, every tile reachable by scrolling the page",
+  G15: "media: images sized and described, canvases inert (there is no video on the site)",
+  G16: "scroll budget: bite to lift, bite to the categories sheet, bite to the first tile row and to all eight tiles",
+  G17: "catalog: no scroller inside it, every tile reachable by scrolling the page and up once it is",
 };
 
 /** Thresholds. Mirrors docs/DESIGN-GUIDELINES.md (sections 6 and 7); change both together. */
 const T = {
-  navMaxPx: 80,
+  navMaxRem: 5, // 80px at a 16px root; the root grows past 1920px wide (globals.css), and the bar with it
   touchTargetPx: 44,
   pointerTargetPx: 24,
   targetGapPx: 8,
@@ -103,8 +103,12 @@ const T = {
   /* G16, in screens (viewport heights) of scroll, for a steady gesture of an eighth of a screen every 250 ms */
   biteWindow: [0.55, 1.15], // where the approved bite lands (0.88 on 1440x800, 0.75 on 390x664 before the budget)
   liftMax: 0.4, // from the bite until the lure is visibly drawn up
-  biteToSheetMax: 2.4, // from the bite until the categories sheet reaches the top
-  sheetToCatalogMax: 0.75, // from the sheet at the top until the catalog is fully in
+  biteToSheetMax: 0.75, // from the bite until the categories sheet's edge comes up into the screen
+  biteToFirstRowMax: 1.2, // from the bite until the first row of tiles is fully on screen and surfaced
+  biteToAllTilesMax: 1.8, // from the bite until every tile has been on screen and surfaced
+  /* on a screen a few hundred pixels tall a "screen" is a poor unit (2.6 of them on a 320 px landscape phone is 840 px), so each budget has a floor in px */
+  biteToFirstRowFloorPx: 450,
+  biteToAllTilesFloorPx: 900,
   liftLengths: 0.6, // "visibly drawn up": the lure has moved this many of its own lengths
 };
 
@@ -154,7 +158,7 @@ const probe = (cfg) => {
     return r.width >= 2 && r.height >= 2;
   };
   const q = (s) => document.querySelector(s);
-  const out = { vw, vh, coarse: window.matchMedia("(pointer: coarse)").matches, hover: window.matchMedia("(hover: hover)").matches };
+  const out = { vw, vh, rootPx: parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, coarse: window.matchMedia("(pointer: coarse)").matches, hover: window.matchMedia("(hover: hover)").matches };
 
   /* G1: with the body's overflow guard switched off, does anything stick out? */
   {
@@ -469,21 +473,8 @@ const probe = (cfg) => {
       }
       if (problems.length) imgs.push(`${sel(img)}: ${problems.join(", ")}`);
     }
-    const videos = [];
-    for (const v of document.querySelectorAll("video")) {
-      const problems = [];
-      if (!v.muted && !v.hasAttribute("muted")) problems.push("not muted");
-      if (!v.playsInline && !v.hasAttribute("playsinline")) problems.push("no playsinline");
-      const panel = v.parentElement;
-      // the poster image mounts when the panel is within ~400px of the viewport, so only expect it then
-      const pr = panel?.getBoundingClientRect();
-      const near = !!pr && pr.bottom > -300 && pr.top < vh + 300;
-      if (near && !v.getAttribute("poster") && !panel?.querySelector("img")) problems.push("no poster");
-      if (!panel?.querySelector('button[aria-label*="ause" i], button[aria-label*="lay" i]') && !document.querySelector(".cat-toggle")) problems.push("no pause control");
-      if (problems.length) videos.push(`${sel(v)}: ${problems.join(", ")}`);
-    }
     const canvases = [...document.querySelectorAll("canvas")].filter((c) => getComputedStyle(c).pointerEvents !== "none").map(sel);
-    out.media = { imgs, videos, canvases };
+    out.media = { imgs, canvases };
   }
 
   return out;
@@ -517,12 +508,23 @@ const probeStatic = () => {
     .filter((a) => a.effect && a.effect.getTiming().iterations === Infinity && a.playState === "running")
     .map((a) => a.animationName || a.constructor.name)
     .slice(0, 6);
-  const track = q(".hero-track");
+  // the hero's own scroll: its spacer (the story) and whether it sticks; the track itself also holds the catalog
+  const spacer = q(".hero-spacer");
+  const heroRoot = q(".hero-root");
   const gradientText = [...document.querySelectorAll(".hero-title .hero-line__inner, .tide")]
     .slice(0, 6)
     .filter((el) => getComputedStyle(el).webkitTextFillColor === "rgba(0, 0, 0, 0)" && getComputedStyle(el).backgroundImage === "none")
     .map((el) => el.className);
-  return { hidden, links, missingIds: ids, infinite, trackH: track ? track.getBoundingClientRect().height : null, vh, gradientText };
+  return {
+    hidden,
+    links,
+    missingIds: ids,
+    infinite,
+    spacerH: spacer ? spacer.getBoundingClientRect().height : 0,
+    heroSticky: heroRoot ? getComputedStyle(heroRoot).position === "sticky" : false,
+    vh,
+    gradientText,
+  };
 };
 
 /* ------------------------------------------------------------------------------------------ */
@@ -589,7 +591,7 @@ function judge(d, c) {
     const problems = [];
     if (!n) problems.push("nav not found");
     else {
-      if (n.r.h > T.navMaxPx + 0.5) problems.push(`nav bar is ${n.r.h}px tall (cap ${T.navMaxPx})`);
+      if (n.r.h > T.navMaxRem * d.rootPx + 0.5) problems.push(`nav bar is ${n.r.h}px tall (cap ${T.navMaxRem * d.rootPx})`);
       if (n.links >= 2 && n.lines !== 1) problems.push(`nav links sit on ${n.lines} lines`);
       if (!n.links && !n.toggleVisible) problems.push("no nav links and no Menu button");
       if (n.logo && (n.logo.l < -1 || n.logo.r > d.vw + 1)) problems.push("logo outside the screen");
@@ -600,7 +602,7 @@ function judge(d, c) {
   if (d.siteNav) {
     const n = d.siteNav;
     const problems = [];
-    if (n.r.h > T.navMaxPx + 0.5) problems.push(`sticky bar is ${n.r.h}px tall (cap ${T.navMaxPx})`);
+    if (n.r.h > T.navMaxRem * d.rootPx + 0.5) problems.push(`sticky bar is ${n.r.h}px tall (cap ${T.navMaxRem * d.rootPx})`);
     if (n.links >= 2 && n.lines !== 1) problems.push(`sticky bar links sit on ${n.lines} lines`);
     if (!n.links && !n.toggleVisible) problems.push("sticky bar has no links and no Menu button");
     gate("G2", problems);
@@ -639,9 +641,9 @@ function judge(d, c) {
     const budget = Math.ceil(d.eyebrows.sections / 3);
     gate("G13", d.eyebrows.count > budget ? [`${d.eyebrows.count} eyebrows in ${d.eyebrows.sections} sections (budget ${budget}): ${d.eyebrows.list.join("; ")}`] : []);
   }
-  // media is checked wherever a panel is near, because the poster only mounts then
+  // media is checked wherever an image is near, because the lazy ones only mount then
   if (state === "top" || state === "catalog" || state === "story") {
-    gate("G15", [...d.media.imgs, ...d.media.videos, ...d.media.canvases.map((c2) => `${c2} accepts pointer events`)]);
+    gate("G15", [...d.media.imgs, ...d.media.canvases.map((c2) => `${c2} accepts pointer events`)]);
   }
   if (["top", "caught", "catalog", "story", "principles", "commitment"].includes(state)) gate("G14", d.align);
   return out;
@@ -653,7 +655,8 @@ function judgeStatic(s, c) {
   // without script or without motion the page is the plain layout: everything is there from the start
   if (c.mode === "nojs" || c.mode === "reduced") {
     if (s.hidden.length) problems.push(`headings not visible: ${s.hidden.join(", ")}`);
-    if (s.trackH && s.trackH > s.vh * 1.25) problems.push(`hero is still ${Math.round(s.trackH)}px tall (a scroll track) without motion`);
+    if (s.spacerH > 1) problems.push(`the hero still has a ${Math.round(s.spacerH)}px story spacer (a scroll track) without motion`);
+    if (s.heroSticky) problems.push("the hero is still pinned (sticky) without motion: the catalog would scroll over a still hero");
   }
   if (c.mode === "nojs") {
     const dead = s.links.filter((l) => !l.ok).map((l) => l.text);
@@ -698,9 +701,11 @@ async function geometry(page) {
     const h = (el) => (el ? el.getBoundingClientRect().height : null);
     const cat = document.getElementById("categories");
     const track = document.querySelector(".hero-track");
+    // the story's length: --hero-screens less two screens (the track also holds the catalog now)
+    const screens = track ? Number.parseFloat(getComputedStyle(track).getPropertyValue("--hero-screens")) || 0 : 0;
     return {
       vh: window.innerHeight,
-      heroTrackH: h(track),
+      storyPx: screens > 2 ? (screens - 2) * window.innerHeight : 0,
       catTop: abs(cat),
       catH: h(cat),
       story: abs(document.getElementById("story")),
@@ -718,8 +723,7 @@ async function enter(page, state, mode) {
       await scrollTo(page, 0, 700);
       break;
     case "caught": {
-      const story = Math.max(0, g.heroTrackH - 2 * g.vh);
-      await scrollTo(page, story * 0.3, 4200);
+      await scrollTo(page, g.storyPx * 0.3, 4200);
       const caught = await page.evaluate(() => !!document.querySelector(".hero-root[data-caught]"));
       if (!caught) {
         await page.evaluate(() => document.querySelector(".hero-root")?.setAttribute("data-caught", ""));
@@ -729,7 +733,9 @@ async function enter(page, state, mode) {
       break;
     }
     case "catalog":
-      await scrollTo(page, scripted ? g.catTop + Math.max(0, g.catH - g.vh) * 0.8 : g.catTop, 2600);
+      // the section's top just below the sticky bar, as a link to it lands (scroll-padding-top); the tiles surface on arrival
+      await page.evaluate(() => document.getElementById("categories")?.scrollIntoView({ block: "start", behavior: "instant" }));
+      await wait(page, scripted ? 2600 : 700);
       break;
     case "modal":
       await page.evaluate(() => document.querySelector(".cat-card")?.click());
@@ -783,10 +789,10 @@ async function tabWalk(page) {
   for (let i = 0; i < 70; i++) {
     await page.keyboard.press("Tab");
     await wait(page, 350); // the skip link slides in over 200 ms
-    // focusing a category tile while the card is closed opens it (the page scrolls into the hold): let the catalog finish fading in before measuring
+    // focusing a category tile that has not surfaced yet brings every tile up at once: let it finish before measuring
     if (await page.evaluate(() => document.activeElement?.classList.contains("cat-card"))) {
       await page
-        .waitForFunction(() => parseFloat(getComputedStyle(document.querySelector(".cat-catalog")).opacity) >= 0.99, undefined, { timeout: 5000 })
+        .waitForFunction(() => parseFloat(getComputedStyle(document.activeElement).opacity) >= 0.99, undefined, { timeout: 5000 })
         .catch(() => {});
       await wait(page, 150);
     }
@@ -857,7 +863,8 @@ async function clsRun(page, vh) {
  * G16: how much scroll lies between the beats after the bite, measured in screens. One steady gesture
  * (an eighth of a screen every 250 ms) finds the bite (the page's own data-caught); from there the page is
  * scrolled and let settle, so the scrub's lag does not count, until the lure is visibly drawn up, the
- * categories sheet is at the top, and the catalog is fully in.
+ * categories sheet's edge has come up into the screen, the first row of tiles is fully on screen and
+ * surfaced, and every tile has been (a tile surfaces on its own clock once it is in view, about a second).
  */
 async function budgetRun(page) {
   const g = await geometry(page);
@@ -871,39 +878,47 @@ async function budgetRun(page) {
       return a && b ? { x: a.left + a.width / 2, y: a.top + a.height / 2, len: Math.hypot(a.left - b.left, a.top - b.top) } : null;
     });
   const caught = () => page.evaluate(() => !!document.querySelector(".hero-root[data-caught]"));
-  const catalogIn = () =>
+  // which tiles are fully on screen and surfaced right now, and is the sheet's edge in the screen
+  const look = () =>
     page.evaluate(() => {
-      const c = document.querySelector(".cat-catalog");
-      return c ? Number(getComputedStyle(c).opacity) >= 0.98 : false;
+      const tiles = [...document.querySelectorAll(".cat-card")];
+      const top0 = tiles[0]?.getBoundingClientRect().top;
+      const up = tiles.map((t) => {
+        const r = t.getBoundingClientRect();
+        return Number(getComputedStyle(t).opacity) >= 0.98 && r.top >= 0 && r.bottom <= window.innerHeight + 1;
+      });
+      const firstRow = tiles.map((t, i) => (Math.abs(t.getBoundingClientRect().top - top0) < 4 ? i : -1)).filter((i) => i >= 0);
+      const sheet = document.getElementById("categories")?.getBoundingClientRect().top ?? Infinity;
+      return { up, firstRow, sheetIn: sheet < window.innerHeight };
     });
 
-  const out = { vh, biteY: null, liftY: null, sheetY: g.catTop, catalogY: null };
+  const out = { vh, biteY: null, liftY: null, sheetY: null, firstRowY: null, allY: null };
+  const end = g.catTop + g.catH;
   let y = 0;
   await scrollTo(page, 0, 700);
   // 1. a steady gesture down until the fish takes the lure
-  while (y < g.catTop && out.biteY === null) {
-    y = Math.min(y + step, g.catTop);
+  while (y < end && out.biteY === null) {
+    y = Math.min(y + step, end);
     await scrollTo(page, y, 250);
     if (await caught()) out.biteY = y;
   }
   if (out.biteY === null) return out;
-  // 2. from the bite: stop and look at every step, until the lure has been drawn up
+  // 2. from the bite: stop and look at every step, until the lure has been drawn up and every tile has surfaced
   await wait(page, 900);
   const base = await tie();
-  while (y < g.catTop && out.liftY === null) {
-    y = Math.min(y + step, g.catTop);
-    await scrollTo(page, y, 900);
-    const now = await tie();
-    if (base && now && Math.hypot(now.x - base.x, now.y - base.y) >= T.liftLengths * base.len) out.liftY = y;
-  }
-  // 3. the categories sheet at the top, then the catalog opening
-  await scrollTo(page, g.catTop, 1200);
-  y = g.catTop;
-  const end = g.catTop + Math.max(0, g.catH - vh);
-  while (y < end && out.catalogY === null) {
+  const seen = new Set();
+  while (y < end && (out.liftY === null || out.allY === null)) {
     y = Math.min(y + step, end);
-    await scrollTo(page, y, 1100);
-    if (await catalogIn()) out.catalogY = y;
+    await scrollTo(page, y, 900);
+    if (out.liftY === null) {
+      const now = await tie();
+      if (base && now && Math.hypot(now.x - base.x, now.y - base.y) >= T.liftLengths * base.len) out.liftY = y;
+    }
+    const s = await look();
+    if (out.sheetY === null && s.sheetIn) out.sheetY = y;
+    s.up.forEach((u, i) => u && seen.add(i));
+    if (out.firstRowY === null && s.firstRow.length && s.firstRow.every((i) => s.up[i])) out.firstRowY = y;
+    if (out.allY === null && s.up.length && seen.size === s.up.length) out.allY = y;
   }
   return out;
 }
@@ -911,28 +926,33 @@ async function budgetRun(page) {
 function judgeBudget(r) {
   const problems = [];
   const screens = (px) => (px / r.vh).toFixed(2);
-  if (r.biteY === null) return ["the fish never took the lure before the categories sheet reached the top"];
+  if (r.biteY === null) return ["the fish never took the lure before the categories"];
   const bite = r.biteY / r.vh;
   if (bite < T.biteWindow[0] || bite > T.biteWindow[1]) problems.push(`the bite lands ${bite.toFixed(2)} screens down (the approved bite is ${T.biteWindow[0]} to ${T.biteWindow[1]})`);
-  if (r.liftY === null) problems.push("the lure is never drawn up before the categories sheet reaches the top");
+  if (r.liftY === null) problems.push("the lure is never drawn up before the categories");
   else if ((r.liftY - r.biteY) / r.vh > T.liftMax) problems.push(`${screens(r.liftY - r.biteY)} screens from the bite until the lure is drawn up (at most ${T.liftMax})`);
-  if ((r.sheetY - r.biteY) / r.vh > T.biteToSheetMax) problems.push(`${screens(r.sheetY - r.biteY)} screens from the bite until the categories sheet is at the top (at most ${T.biteToSheetMax})`);
-  if (r.catalogY === null) problems.push("the catalog is not fully in at the end of its card");
-  else if ((r.catalogY - r.sheetY) / r.vh > T.sheetToCatalogMax) problems.push(`${screens(r.catalogY - r.sheetY)} screens from the sheet at the top until the catalog is fully in (at most ${T.sheetToCatalogMax})`);
+  if (r.sheetY === null) problems.push("the categories sheet never comes up into the screen");
+  else if ((r.sheetY - r.biteY) / r.vh > T.biteToSheetMax) problems.push(`${screens(r.sheetY - r.biteY)} screens from the bite until the categories sheet comes up (at most ${T.biteToSheetMax})`);
+  if (r.firstRowY === null) problems.push("the first row of tiles is never fully on screen and surfaced");
+  else if (r.firstRowY - r.biteY > Math.max(T.biteToFirstRowMax * r.vh, T.biteToFirstRowFloorPx)) problems.push(`${screens(r.firstRowY - r.biteY)} screens (${Math.round(r.firstRowY - r.biteY)}px) from the bite until the first row of tiles is in (at most ${T.biteToFirstRowMax}, or ${T.biteToFirstRowFloorPx}px on a short screen)`);
+  if (r.allY === null) problems.push("not every tile surfaces by the end of the section");
+  else if (r.allY - r.biteY > Math.max(T.biteToAllTilesMax * r.vh, T.biteToAllTilesFloorPx)) problems.push(`${screens(r.allY - r.biteY)} screens (${Math.round(r.allY - r.biteY)}px) from the bite until every tile has surfaced (at most ${T.biteToAllTilesMax}, or ${T.biteToAllTilesFloorPx}px on a short screen)`);
   return problems;
 }
 
-/** G17: is the catalog a scroller of its own, and can the last tile be brought into view by scrolling the page? */
+/** G17: is the catalog a scroller of its own, and is the last tile on screen and surfaced once the page is scrolled to it? */
 const catalogReach = () => {
   const cat = document.querySelector(".cat-catalog");
   const tiles = [...document.querySelectorAll(".cat-card")];
   if (!cat || !tiles.length) return null;
   const overflow = cat.scrollHeight - cat.clientHeight;
-  const last = tiles[tiles.length - 1].getBoundingClientRect();
+  const last = tiles[tiles.length - 1];
+  const r = last.getBoundingClientRect();
   return {
     scroller: /auto|scroll/.test(getComputedStyle(cat).overflowY) && overflow > 1,
     overflow,
-    lastBottom: Math.round(last.bottom),
+    lastBottom: Math.round(r.bottom),
+    lastOpacity: Number(getComputedStyle(last).opacity),
     vh: window.innerHeight,
   };
 };
@@ -985,13 +1005,14 @@ async function runScreen(browser, screen, o, results) {
       for (const r of judge(data, { screen, state })) record("js", state, r.gate, r.problems.map((p) => (note.forced ? `[forced data-caught] ${p}` : p)), r.warns);
       await shot(page, state);
       if (state === "catalog") {
-        // G17: at the end of the card's hold the last tile must be on screen, and nothing inside the card scrolls
-        const g = await geometry(page);
-        await scrollTo(page, g.catTop + Math.max(0, g.catH - g.vh) * 0.97, 2400);
+        // G17: scrolling the page brings the last tile on screen, surfaced, and nothing inside the catalog scrolls
+        await page.evaluate(() => [...document.querySelectorAll(".cat-card")].pop()?.scrollIntoView({ block: "end", behavior: "instant" }));
+        await wait(page, 2400);
         const reach = await page.evaluate(catalogReach);
         const problems = [];
-        if (reach?.scroller) problems.push(`the catalog scrolls inside the card (${reach.overflow}px of overflow): a touch that starts on it does not move the page`);
-        if (reach && reach.lastBottom > reach.vh + 1) problems.push(`the last tile ends at ${reach.lastBottom}px on a ${reach.vh}px screen at the end of the card`);
+        if (reach?.scroller) problems.push(`the catalog scrolls inside itself (${reach.overflow}px of overflow): a touch that starts on it does not move the page`);
+        if (reach && reach.lastBottom > reach.vh + 1) problems.push(`the last tile ends at ${reach.lastBottom}px on a ${reach.vh}px screen when scrolled to`);
+        if (reach && reach.lastOpacity < 0.98) problems.push(`the last tile has not surfaced (opacity ${reach.lastOpacity.toFixed(2)}) 2.4 s after it came into view`);
         record("js", state, "G17", problems);
         await enter(page, "catalog", "js");
       }
@@ -1025,9 +1046,10 @@ async function runScreen(browser, screen, o, results) {
       biteAt: sc(budget.biteY, 0),
       biteToLift: sc(budget.liftY, budget.biteY),
       biteToSheet: sc(budget.sheetY, budget.biteY),
-      sheetToCatalog: sc(budget.catalogY, budget.sheetY),
+      biteToFirstRow: sc(budget.firstRowY, budget.biteY),
+      biteToAllTiles: sc(budget.allY, budget.biteY),
     };
-    process.stdout.write(`    scroll budget (screens): bite at ${sc(budget.biteY, 0)}, +${sc(budget.liftY, budget.biteY)} to the lure drawn up, +${sc(budget.sheetY, budget.biteY)} to the categories sheet, +${sc(budget.catalogY, budget.sheetY)} sheet to catalog\n`);
+    process.stdout.write(`    scroll budget (screens): bite at ${sc(budget.biteY, 0)}, +${sc(budget.liftY, budget.biteY)} to the lure drawn up, +${sc(budget.sheetY, budget.biteY)} to the categories sheet, +${sc(budget.firstRowY, budget.biteY)} to the first tile row, +${sc(budget.allY, budget.biteY)} to all eight tiles\n`);
     await ctx.close();
   }
 
