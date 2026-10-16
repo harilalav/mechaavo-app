@@ -10,11 +10,6 @@
       "rule": "hand-svg",
       "file": "components/hero/LureArt.tsx",
       "reason": "D5/D9: the procedural lure artwork (brief: no photography). It is art, not an icon, and every layer is aria-hidden."
-    },
-    {
-      "rule": "hand-svg",
-      "file": "components/showcase/ProductCategories.tsx",
-      "reason": "D9: the one decorative swell edge where the categories sheet meets the hero water (brief-supplied)."
     }
   ]
 }

@@ -6,10 +6,9 @@ import { SECTION_IDS } from "../config/sections";
  * page's own white instead of cutting: a veil fades in over the old view, the
  * browser does the jump while it is covered, the veil lifts off the new one.
  *
- * Why a fade and not a fast scroll: every target lies past two scrubbed, pinned
- * stages (the hero track, about six screens, then the categories card, three). Scrolling
- * through them would play the whole catch and the card opening at ten
- * times speed to get somewhere else. A cut would hide all of that, but it reads as a bug.
+ * Why a fade and not a fast scroll: every target lies past the hero's scrubbed story (the
+ * catch, the reel, the camera sinking under the catalog). Scrolling through it would play the
+ * whole catch at ten times speed to get somewhere else. A cut would hide all of that, but it reads as a bug.
  *
  * - Plain `<a href="#id">` links stay the source of truth: no script, a modifier click
  *   (new tab) or reduced motion all fall through to the browser's own jump.
@@ -75,6 +74,8 @@ export function startSectionJumps(veil: HTMLElement): () => void {
       } else {
         window.location.hash = id;
       }
+      // the hero's scrubs catch up at once (heroTimeline.ts), so nothing plays out under the veil's lift
+      window.dispatchEvent(new CustomEvent("section-jump", { detail: { id } }));
       await afterPaint();
       if (mine !== run) return;
 

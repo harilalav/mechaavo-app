@@ -376,6 +376,32 @@ rule({
 });
 
 rule({
+  id: "sea-scope",
+  level: "error",
+  exts: [".css", ".ts", ".tsx"],
+  describe: "The four water and fish tokens (D12: sea-shallow, sea-mid, sea-deep, brand-blue; roles --water, --water-mid, --water-deep, --fish) colour the water and the fish only: never text, and only in the water and fish files.",
+  run(file) {
+    const path = file.path.replace(/\\/g, "/");
+    const out = [];
+    // text in a sea colour, anywhere (the sea is 2:1 or less on the page white)
+    for (const m of matches(/(?<![-\w])color\s*:[^;{}]*var\(--(?:water|water-mid|water-deep|fish|color-sea-shallow|color-sea-mid|color-sea-deep|color-brand-blue)\)/, file.clean)) {
+      out.push({ index: m.index, message: "text in a water or fish colour: text stays on the eight UI tokens (ink, ink-soft, ...)" });
+    }
+    const home =
+      /^src\/styles\/(theme|roles|underwater|story|categories(?:-plate|-inspector)?)\.css$/.test(path) ||
+      path.startsWith("lib/underwater/") ||
+      path === "lib/theme/brand.ts";
+    if (home) return out;
+    const css = /var\(--(?:water|water-mid|water-deep|fish|color-sea-shallow|color-sea-mid|color-sea-deep|color-brand-blue)\)/;
+    const canvas = /["'](?:seaShallow|seaMid|seaDeep|brandBlue)["']/;
+    for (const m of matches(path.endsWith(".css") ? css : canvas, file.clean)) {
+      out.push({ index: m.index, message: "a water or fish token outside the water and fish files (D12): the UI uses the eight tokens" });
+    }
+    return out;
+  },
+});
+
+rule({
   id: "hover-gate",
   level: "error",
   exts: [".css"],
@@ -664,6 +690,21 @@ rule({
 });
 
 rule({
+  id: "site-placeholder",
+  level: "warn",
+  exts: [],
+  repo: true,
+  describe: "Warns while lib/config/site.ts says SITE_IS_PLACEHOLDER = true: the site's address is a stand-in, so the sitemap, robots.txt, share image and structured data point at it and the page has no canonical tag (`--strict` makes it fail).",
+  run(_file, ctx) {
+    const file = ctx.files.find((f) => f.path.replace(/\\/g, "/").endsWith("lib/config/site.ts"));
+    if (!file) return [];
+    const m = /SITE_IS_PLACEHOLDER\s*(?::\s*boolean\s*)?=\s*true/.exec(file.clean);
+    if (!m) return [];
+    return [{ line: file.clean.slice(0, m.index).split("\n").length, path: "lib/config/site.ts", message: "the site's address is a placeholder: put the live origin in SITE.url and set SITE_IS_PLACEHOLDER to false before launch (docs/seo.md)" }];
+  },
+});
+
+rule({
   id: "eyebrow-count",
   level: "info",
   exts: [],
@@ -770,6 +811,12 @@ const FIXTURES = [
   ["a.css", "@media (prefers-reduced-motion: reduce) and (hover: hover) { .a:hover::before { opacity: 1; } }", []],
   ["a.css", ".a { height: 100vh; }", ["vh-unit"]],
   ["a.css", ".a { height: 100svh; min-height: 90dvh; }", []],
+  ["a.css", ".a { background: var(--water); }", ["sea-scope"]],
+  ["a.css", ".a { color: var(--fish); }", ["sea-scope"]],
+  ["src/styles/story.css", ".a { background: var(--water); }", []],
+  ["src/styles/story.css", ".a { color: var(--water-deep); }", ["sea-scope"]],
+  ["lib/underwater/x.ts", "ctx.fillStyle = palette.alpha(\"seaDeep\", 0.4);", []],
+  ["components/x.tsx", "const c = palette.solid(\"brandBlue\");", ["sea-scope"]],
   ["a.css", ".a { width: calc(100vw - 2rem); }", ["vh-unit"]],
   ["a.css", ".a { width: 68vw; }", []],
   ["a.css", ".a { font-size: 0.65rem; }", ["font-floor"]],

@@ -5,6 +5,7 @@ import {
   createBubblePool,
   drawBubbles,
   emitBubbles,
+  emitFine,
   emitRipple,
   emitSplash,
   emitStream,
@@ -102,6 +103,8 @@ const WARM_FRAMES = 150;
 const SOFT_SCALE = 0.3;
 const SOFT_BLUR_SCALE = SOFT_SCALE / 2;
 const MAX_STEP = 0.04;
+/** How long the catch takes to ease out of (or back into) the picture as the hero becomes a backdrop. */
+const CATCH_FADE_MS = 350;
 
 /** Depth to parallax strength. Far layers barely move; near layers rush past. */
 const parallax = (depth: number): number => 0.25 + 1.25 * depth;
@@ -125,6 +128,10 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   let height = 0;
   let dpr = 1;
   let degrade = 0;
+  /** 1 = the catch (hooked fish, line, glow, bubbles) fully drawn; eases to 0 while the hero is a backdrop. */
+  let catchAlpha = 1;
+  /** ms not yet drawn while the hero is a backdrop (it draws at a lower rate). */
+  let pending = 0;
   let quality: QualityProfile = getQuality(1280, 800);
 
   const world: World = {
@@ -163,7 +170,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   let particles: ParticleField | null = null;
   let activeParticles = 0;
   let seabed: SeabedLayer[] = [];
-  const bubbles = createBubblePool(120, SEED + 7);
+  const bubbles = createBubblePool(180, SEED + 7);
   const rig = createLureRig(SEED + 13);
   const current = createCurrent();
   const simRng = createRng(SEED + 3);
@@ -222,7 +229,8 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   let trackOffX = 0;
   let trackOffY = 0;
   /** Time since the last bubble was left behind by the lure as it dives in, and by a fish being drawn up. */
-  let diveClock = 0;
+  /** Seconds until the dive's next bubble: irregular, so the trail never ticks like a metronome. */
+  let diveWait = 0;
   let reelClock = 0;
   // a few frames of the hero fish's recent poses, for the strike's motion blur
   const trail = [
@@ -246,8 +254,14 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   // caustic light: one seamless tile, built in slices off the critical path, then faded in by CSS
   // (set on the document, so the story section below the hero can lay the same light over its water)
   const page = document.documentElement;
+  let causticUrl: string | null = null;
   void createCausticTile(320, palette.rgb("white"), () => destroyed).then((tile) => {
-    if (!tile || destroyed) return;
+    if (!tile) return;
+    if (destroyed) {
+      URL.revokeObjectURL(tile);
+      return;
+    }
+    causticUrl = tile;
     page.style.setProperty("--caustic-tile", `url("${tile}")`);
     page.setAttribute("data-caustic", "");
   });
@@ -479,21 +493,32 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       splashed = true;
       const fx = world.lureLength / FX_LURE;
       emitSplash(bubbles, world.logo.x, world.logo.y, 0.9 * Math.max(0.6, fx));
-      emitBubbles(bubbles, world.logo.x, world.logo.y, 6, 9 * fx, 34 * fx, 2.2);
+      // bubbles are drawn at the lure's current scale (drawBubbles below), and the lure starts small: size them
+      // for the screen, not for the lure, or a trail of quarter-pixel dots is what the dive leaves
+      emitFine(bubbles, world.logo.x, world.logo.y, 4, 9 * fx, 34 * fx, 2.2 / Math.max(0.3, fx * 0.4));
     }
 
     // 2. where the lure is right now
     readLure();
 
-    // the dive in leaves a trail of bubbles behind the lure: more of them while it is moving fast
-    if (!rig.introDone && rig.introClock > 0.1 && lureValid) {
+    // the dive in leaves a thin, irregular thread of fine bubbles behind the lure: a handful a second, a touch
+    // more while it is moving fastest in the middle of its swim, none once it is nearly there (a crowd of
+    // them read as stickers; the 12 to 34 a second it used to be was a metronome of identical ones)
+    if (!rig.introDone && rig.introClock > 0.1 && lureValid && rig.introU < 0.92) {
       const fx = world.lureLength / FX_LURE;
       const u = rig.introU;
-      const rate = 6 + 16 * (4 * u * (1 - u));
-      diveClock += dt;
-      while (diveClock > 1 / rate) {
-        diveClock -= 1 / rate;
-        emitBubbles(bubbles, lure.tailX, lure.tailY, 1, 5 * fx * lure.scale, 20 * fx, 1.9 * fx * Math.max(0.5, lure.scale));
+      const rate = 3.5 + 5 * (4 * u * (1 - u));
+      diveWait -= dt;
+      // drawBubbles multiplies a bubble's radius by the lure's scale at the time it is drawn: dividing by it here
+      // makes the radius a size on the screen (about 1 to 3 px, however small the lure still is)
+      const drawScale = Math.max(0.3, lure.scale * fx);
+      let guard = 0;
+      while (diveWait <= 0 && guard++ < 3) {
+        // 1 bubble, now and then 2 close together: a thread with the odd knot in it
+        const knot = bubbles.rng() < 0.22 ? 2 : 1;
+        const onScreen = (1.3 + 1.1 * u) * Math.max(0.8, fx);
+        emitFine(bubbles, lure.tailX, lure.tailY, knot, 5 * fx * Math.max(0.4, lure.scale), 22 * fx, onScreen / drawScale);
+        diveWait += (1 / rate) * (0.45 + 1.4 * bubbles.rng());
       }
     }
 
@@ -574,7 +599,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     const shakeX = jolt > 0.01 ? Math.sin(time * 52) * 3.2 * jolt * k : 0;
     const shakeY = jolt > 0.01 ? Math.sin(time * 61 + 1.3) * 2.4 * jolt * k : 0;
     proj.x = world.focusX + (wx - world.focusX) * z + swayX + shakeX;
-    proj.y = world.focusY + (wy - world.focusY) * z - scene.descend * height * 0.09 * k + swayY + shakeY;
+    proj.y = world.focusY + (wy - world.focusY) * z - (scene.descend + 0.4 * scene.sink) * height * 0.09 * k + swayY + shakeY;
     proj.s = z;
   };
 
@@ -649,13 +674,14 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       for (let i = trail.length - 1; i >= 0; i--) {
         view.x = trail[i].x;
         view.y = trail[i].y;
-        view.alpha = 0.2 / (i + 1);
+        view.alpha = (0.2 / (i + 1)) * catchAlpha;
         renderer.draw(ctx, fish, view);
       }
     }
     view.x = fish.x;
     view.y = fish.y;
-    view.alpha = primaryFade(fish, view.length);
+    view.alpha = primaryFade(fish, view.length) * catchAlpha;
+    if (view.alpha <= 0.004) return;
     renderer.draw(ctx, fish, view);
   };
 
@@ -681,7 +707,8 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
         ctx.fill();
         continue;
       }
-      ctx.fillStyle = palette.alpha("secondary", (0.06 + 0.2 * z[i]) * flicker * calmFade);
+      // sediment in the ocean: deep-blue motes (D12)
+      ctx.fillStyle = palette.alpha("seaDeep", (0.07 + 0.22 * z[i]) * flicker * calmFade);
       ctx.beginPath();
       ctx.arc(proj.x, proj.y, r, 0, TAU);
       ctx.fill();
@@ -697,7 +724,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       const y0 = height - layer.height + layer.foot;
       const sway = Math.sin(time * 0.08 + layer.depth * 4) * 5 * k;
       const dx = world.focusX + (x0 - world.focusX) * z + sway;
-      const dy = world.focusY + (y0 - world.focusY) * z - scene.descend * height * 0.09 * k;
+      const dy = world.focusY + (y0 - world.focusY) * z - (scene.descend + 0.4 * scene.sink) * height * 0.09 * k;
       ctx.drawImage(layer.canvas, dx, dy, w * z, layer.height * z);
       drawWeed(ctx, layer, dx, dy, z, current);
     }
@@ -708,8 +735,9 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     const strength = (0.05 + 0.06 * scene.engage * (1 - scene.calm) + pulse) * smoothstep(0, 0.4, rig.introU);
     const radius = lure.length * 0.78;
     const g = ctx.createRadialGradient(lure.centerX, lure.centerY, 0, lure.centerX, lure.centerY, radius);
-    g.addColorStop(0, palette.alpha("accentSecondary", strength));
-    g.addColorStop(1, palette.alpha("accentSecondary", 0));
+    // sunlit water around the lure, a pale azure (D12)
+    g.addColorStop(0, palette.mix("seaShallow", "white", 0.45, strength * 1.4));
+    g.addColorStop(1, palette.mix("seaShallow", "white", 0.45, 0));
     ctx.fillStyle = g;
     ctx.fillRect(lure.centerX - radius, lure.centerY - radius, radius * 2, radius * 2);
   };
@@ -729,7 +757,8 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
    */
   const drawLine = (ctx: CanvasRenderingContext2D) => {
     const brain = pop!.brain;
-    const visibility = Math.max(0.7, smoothstep(0, 0.4, rig.introU));
+    const visibility = Math.max(0.7, smoothstep(0, 0.4, rig.introU)) * catchAlpha;
+    if (visibility <= 0.004) return;
 
     const reach = Math.hypot(width, height) * 1.35;
     const angle = world.stacked ? LINE_ANGLE_STACKED : LINE_ANGLE;
@@ -779,7 +808,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     ctx.lineJoin = "round";
     // 1. Water refraction glow halo
     trace(0, 0);
-    ctx.strokeStyle = palette.alpha("accentSecondary", 0.45 * visibility);
+    ctx.strokeStyle = palette.alpha("seaShallow", 0.5 * visibility);
     ctx.lineWidth = Math.max(3.2, 4.0 * Math.sqrt(lure.scale));
     ctx.stroke();
 
@@ -825,8 +854,10 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     drawSeabed(backCtx);
     for (const fish of backList) drawFish(backCtx, fish);
     drawParticles(backCtx, false);
-    if (lureValid) {
+    if (lureValid && catchAlpha > 0.004) {
+      backCtx.globalAlpha = catchAlpha;
       drawLureGlow(backCtx);
+      backCtx.globalAlpha = 1;
     }
     if (primaryReady && !primaryFront) drawPrimary(backCtx, primary, false);
 
@@ -886,7 +917,11 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       }
     }
 
-    if (lureValid) drawBubbles(frontCtx, bubbles, palette, lure.scale * (world.lureLength / FX_LURE));
+    if (lureValid && catchAlpha > 0.004) {
+      frontCtx.globalAlpha = catchAlpha;
+      drawBubbles(frontCtx, bubbles, palette, lure.scale * (world.lureLength / FX_LURE));
+      frontCtx.globalAlpha = 1;
+    }
     drawParticles(frontCtx, true);
 
     // remember where the hero fish was for next frame's blur
@@ -907,8 +942,49 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     raf = requestAnimationFrame(frame);
     const elapsed = now - last;
     last = now;
-    // the next section is fully over the hero: nothing here can be seen, so do no work
-    if (scene.covered) return;
+
+    // The catch eases out of the picture once the hero is a backdrop behind the catalog (and back in when the
+    // reader scrolls up past it): the hooked fish, the line, the lure's glow and its bubbles fade over ~350 ms,
+    // so nothing pops. This runs on every frame, drawn or not, so it keeps time.
+    const fadeTarget = scene.backdrop ? 0 : 1;
+    if (catchAlpha !== fadeTarget) {
+      const stepBy = Math.min(1, elapsed / CATCH_FADE_MS);
+      catchAlpha = fadeTarget > catchAlpha ? Math.min(fadeTarget, catchAlpha + stepBy) : Math.max(fadeTarget, catchAlpha - stepBy);
+    }
+
+    // the story section has come up over the whole hero: nothing of it can be seen
+    if (scene.covered) {
+      pending = 0;
+      return;
+    }
+
+    if (scene.backdrop) {
+      // the inspector is open over everything: nothing of the water can be seen through its scrim
+      if (document.documentElement.hasAttribute("data-inspector")) {
+        pending = 0;
+        return;
+      }
+      // a live backdrop, not the main act: draw at most every 32 ms (48 on a phone or in lite mode), stepping
+      // the water through the whole of the time that passed, so its motion keeps its speed
+      pending += elapsed;
+      const gap = quality.tier === "phone" || root.hasAttribute("data-lite") ? 48 : 32;
+      if (pending < gap) return;
+      let remaining = Math.min(0.12, pending / 1000);
+      pending = 0;
+      while (remaining > 0.0005) {
+        const dt = Math.min(MAX_STEP, remaining);
+        step(dt);
+        remaining -= dt;
+      }
+      draw();
+      // no frame-rate sampling here: the catalog's compositing is not the engine's, and the one-way lite
+      // switch (`data-lite`) would strip the hero's light for the rest of the visit on its account
+      frames = 0;
+      frameMsTotal = 0;
+      return;
+    }
+    pending = 0;
+
     step(Math.min(MAX_STEP, elapsed / 1000));
     draw();
 
@@ -964,7 +1040,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   // Hovering (or focusing) the logo sends a stream of bubbles out of it and across the screen.
   let lastStream = -10;
   const sendStream = () => {
-    if (destroyed || scene.reduced || scene.covered || !visible || document.hidden || !logoElement) return;
+    if (destroyed || scene.reduced || scene.backdrop || scene.covered || !visible || document.hidden || !logoElement) return;
     if (time - lastStream < 1.6) return; // a stream at a time, however the pointer jitters
     lastStream = time;
     const logo = logoElement.getBoundingClientRect();
@@ -1019,6 +1095,8 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       resetLureRig(anchors.rig);
       page.style.removeProperty("--caustic-tile");
       page.removeAttribute("data-caustic");
+      if (causticUrl) URL.revokeObjectURL(causticUrl);
+      causticUrl = null;
       root.removeAttribute("data-lite");
       root.removeAttribute("data-lure");
       root.removeAttribute("data-caught");

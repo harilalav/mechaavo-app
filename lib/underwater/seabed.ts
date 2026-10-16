@@ -78,8 +78,9 @@ export function createSeabed(
     // wider than the viewport so horizontal sway / push-in never shows an edge
     const layerWidth = width * 1.5;
     const body = Math.round(height * spec.heightRatio);
-    // the camera sinks through the water, lifting the seabed; the extra foot keeps the bottom edge covered
-    const foot = Math.round(height * 0.16);
+    // the camera sinks through the water, lifting the seabed (descend, then sink as the catalog rises through
+    // the water: up to 1.4 x 9% of the height at the deepest parallax); the extra foot keeps the bottom edge covered
+    const foot = Math.round(height * 0.24);
     const layerHeight = body + foot;
     canvas.width = Math.round(layerWidth * scale);
     canvas.height = Math.round(layerHeight * scale);
@@ -100,9 +101,12 @@ export function createSeabed(
       );
     };
 
+    // the seabed in the client's ocean (D12): azure where the light reaches the crest, navy at
+    // the foot; the far ridge is hazier (more of the sea between it and the camera)
+    const far = spec.weed === 0;
     const fill = ctx.createLinearGradient(0, base - amp, 0, layerHeight);
-    fill.addColorStop(0, palette.alpha("secondary", spec.crest));
-    fill.addColorStop(1, palette.alpha(spec.weed === 0 ? "secondary" : "dark", spec.foot));
+    fill.addColorStop(0, palette.mix("seaMid", "seaDeep", far ? 0.25 : 0.5, spec.crest * (far ? 1.4 : 1.15)));
+    fill.addColorStop(1, far ? palette.mix("seaMid", "seaDeep", 0.7, spec.foot) : palette.mix("seaDeep", "dark", 0.35, spec.foot));
     ctx.beginPath();
     ctx.moveTo(0, layerHeight);
     for (let x = 0; x <= layerWidth; x += 12) ctx.lineTo(x, ridge(x));
@@ -111,14 +115,28 @@ export function createSeabed(
     ctx.fillStyle = fill;
     ctx.fill();
 
+    // sunlight reaching the seabed from the upper left (where the hero's light comes
+    // from): the near ridge is paler there, which is also where the captions sit on it,
+    // so their ink keeps its contrast. Painted only onto the ridge (source-atop).
+    if (!far) {
+      const sun = ctx.createLinearGradient(0, 0, layerWidth, 0);
+      sun.addColorStop(0, palette.alpha("white", 0.84));
+      sun.addColorStop(0.34, palette.alpha("white", 0.7));
+      sun.addColorStop(0.64, palette.alpha("white", 0));
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = sun;
+      ctx.fillRect(0, 0, layerWidth, layerHeight);
+      ctx.globalCompositeOperation = "source-over";
+    }
+
     // faint rim so the far ridge reads against the water behind it
-    if (spec.weed === 0) {
+    if (far) {
       ctx.beginPath();
       for (let x = 0; x <= layerWidth; x += 12) {
         if (x === 0) ctx.moveTo(x, ridge(x));
         else ctx.lineTo(x, ridge(x));
       }
-      ctx.strokeStyle = palette.alpha("secondary", 0.18);
+      ctx.strokeStyle = palette.alpha("seaShallow", 0.35);
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -151,7 +169,7 @@ export function createSeabed(
         lean: Float32Array.from(planned, (p) => p.lean),
         width: Float32Array.from(planned, (p) => p.width),
         phase: Float32Array.from(planned, (p) => p.phase),
-        style: palette.alpha("dark", spec.weedAlpha),
+        style: palette.mix("seaDeep", "dark", 0.5, spec.weedAlpha),
       };
     }
 

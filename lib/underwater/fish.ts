@@ -54,8 +54,8 @@ type LaneTier = "far" | "mid" | "near";
  */
 const TIERS: Record<LaneTier, TierSpec> = {
   far: { depth: [0.1, 0.3], lures: [0.25, 0.38], speed: [1.4, 2.2], opacity: [0.42, 0.58], kick: 0 },
-  mid: { depth: [0.4, 0.62], lures: [0.95, 1.25], speed: [1.1, 1.7], opacity: [0.68, 0.86], kick: 0.35 },
-  near: { depth: [0.8, 0.96], lures: [1.5, 1.85], speed: [0.85, 1.35], opacity: [0.55, 0.75], kick: 0.25 },
+  mid: { depth: [0.4, 0.62], lures: [0.95, 1.25], speed: [1.1, 1.7], opacity: [0.8, 0.94], kick: 0.35 },
+  near: { depth: [0.8, 0.96], lures: [1.5, 1.85], speed: [0.85, 1.35], opacity: [0.76, 0.92], kick: 0.25 },
 };
 
 /** Fish that circle the lure, in lure lengths: about as long as the lure when they are beside it. */

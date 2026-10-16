@@ -68,23 +68,27 @@ export function HeroCopy() {
       </div>
 
       <div className="hero-statement-slot">
-        <h2 className="hero-statement display-type tide">
-          {STATEMENT.map((word, i) => (
-            <span key={word} className="hero-line">
-              <span className="hero-line__inner" style={{ "--i": i } as CSSProperties}>
-                {i === STATEMENT.length - 1 ? (
-                  <>
-                    <Mark>{word}</Mark>
-                    <Drop />
-                  </>
-                ) : (
-                  word
-                )}
+        {/* the statement leaves as the camera sinks under the catalog (heroTimeline.ts writes this wrapper's
+            opacity: the slot's own belongs to the catch, data-caught) */}
+        <div className="hero-statement-fade">
+          <h2 className="hero-statement display-type tide">
+            {STATEMENT.map((word, i) => (
+              <span key={word} className="hero-line">
+                <span className="hero-line__inner" style={{ "--i": i } as CSSProperties}>
+                  {i === STATEMENT.length - 1 ? (
+                    <>
+                      <Mark>{word}</Mark>
+                      <Drop />
+                    </>
+                  ) : (
+                    word
+                  )}
+                </span>
               </span>
-            </span>
-          ))}
-        </h2>
-        <p className="hero-statement__sub">Every detail engineered. Every product trusted.</p>
+            ))}
+          </h2>
+          <p className="hero-statement__sub">Every detail engineered. Every product trusted.</p>
+        </div>
       </div>
     </>
   );

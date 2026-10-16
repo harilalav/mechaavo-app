@@ -1,0 +1,512 @@
+/*
+ * The inspector (components/showcase/CategoryInspector.tsx): the dialog a plate opens, laid out
+ * as a ledger. The plate's photo window flies out of the plate into the dialog's own photo and
+ * the sheet comes up around it; closing runs it back to the plate (lib/animations/categoryInspector.ts
+ * drives the flight, this file holds what it leaves in the page).
+ *
+ * Marks on the dialog that the motion sets, all optional:
+ *   data-motion    the dialog is animating at all (not reduced motion): the scrim fades in
+ *   data-morph     the plate itself is flying in (the shell) with its photo (the ghost): the panel waits
+ *   data-landed    they have landed (or there was no flight): the panel and photo are shown, the ledger rises
+ *   data-closing   on its way out: the ledger fades, then (data-ghosting) the shell flies back into the plate
+ * Without a flight (no data-morph) the panel comes up and goes on its own.
+ * Without script, or with reduced motion, none are set and the dialog simply appears and goes.
+ *
+ * Tokens and roles only. The water tokens (D12) appear only on the sounding column, which is a water column.
+ */
+
+/* the dialog sits above the page (the one page-level layer it needs: --z-modal in globals.css) */
+.cat-modal {
+  --cat-modal-z-close: 2;
+  --cat-modal-z-shell: 3;
+  --cat-modal-z-ghost: 4;
+
+  z-index: var(--z-modal);
+}
+
+/* the scrim: the page's own dark, over the whole page. No backdrop blur: a filter over the whole page costs a frame, every frame. */
+.cat-modal__scrim {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-dark) 62%, transparent);
+}
+
+.cat-modal__panel {
+  position: relative;
+  width: 100%;
+  max-width: 46rem;
+  /* dvh: fits the visible screen as the browser bars come and go, and the page behind does not scroll at its end */
+  max-height: 90dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background-color: var(--page);
+  box-shadow: 0 40px 80px -36px color-mix(in srgb, var(--color-dark) 78%, transparent);
+  overflow-wrap: anywhere;
+}
+@media (min-width: 768px) {
+  .cat-modal__panel {
+    padding: 2.5rem;
+  }
+}
+
+/*
+ * The close button's row: it has no height, so nothing is pushed down, and it sticks
+ * to the top of the panel while the panel scrolls, so the way out is always in reach.
+ * It sits above the photo and the heading's plate, which are positioned too.
+ */
+.cat-modal__close-row {
+  position: sticky;
+  top: 0.75rem;
+  z-index: var(--cat-modal-z-close);
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+}
+/*
+ * The close button is a small round button (client round 3: "the close button is too big"): 36px with a 16px
+ * cross, over the photo's corner. 24px is the target size for a fine pointer (WCAG 2.2 AA); a touch screen keeps the
+ * 44px target, with the 2px focus ring held in at 2px (the global ring is offset 3px, which with a 44px circle read as a
+ * second, larger button when the dialog opened with the close button focused).
+ */
+.cat-modal__close {
+  width: 2.25rem;
+  height: 2.25rem;
+  /* a quiet edge on the photo: the page's own light, a hair of shadow */
+  box-shadow: 0 2px 8px -2px color-mix(in srgb, var(--color-dark) 38%, transparent);
+}
+.cat-modal__close:focus-visible {
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .cat-modal__close {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* the photo: to the panel's edges (its padding is 1.5rem, 2.5rem from md), the top corners following the panel's */
+.cat-modal__photo {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  isolation: isolate;
+  aspect-ratio: 2.4 / 1;
+  margin: -1.5rem -1.5rem 1.5rem;
+  background-color: var(--page-alt);
+}
+@media (min-width: 768px) {
+  .cat-modal__photo {
+    margin: -2.5rem -2.5rem 1.75rem;
+  }
+}
+.cat-modal__img {
+  object-fit: cover;
+}
+
+/*
+ * The shell: the plate itself in flight, growing into the dialog and shrinking back (categoryInspector.ts).
+ * A full-screen layer painted like the plate, of which only a clip-path window shows; the window travels from
+ * the plate's box to the panel's, so the corners never stretch. Its fill is animated from the plate's (glass or
+ * white) to the panel's. Gone when it lands.
+ */
+.cat-shell {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cat-modal-z-shell);
+  pointer-events: none;
+  background-color: var(--page);
+  will-change: clip-path;
+}
+/* the plate in the grid while it is "the dialog": hidden, still in the layout and in the accessibility tree */
+.cat-card[data-morphing] {
+  opacity: 0;
+}
+/*
+ * The plate while it is "the dialog" and after it comes back, until the pointer moves (data-calm, set and
+ * released by categoryInspector.ts): at rest, whatever the pointer or the focus say, and with no transitions.
+ * It used to come back still "touched" (the pointer had not moved from it): lifted, the photo zoomed, the ring
+ * lit, the name's plate wiping in, while the flight landed on the resting plate, so everything moved in the last
+ * frame of the way back. Now the flight lands on exactly what it lands on, and the plate eases into hover or
+ * focus on the first pointer move, as it does at any other time. (Specificity: one class more than the hover and
+ * focus rules in categories-plate.css, which it must beat.)
+ */
+.cat-grid .cat-card[data-calm],
+.cat-grid .cat-card[data-calm] *,
+.cat-grid .cat-card[data-calm]::before,
+.cat-grid .cat-card[data-calm]::after {
+  transition: none;
+}
+.cat-grid .cat-card[data-calm] {
+  --lit: 0;
+
+  transform: none;
+}
+.cat-grid .cat-card[data-calm] .cat-card__name .tide__plate {
+  transform: scaleX(0) skewX(var(--tide-skew));
+  opacity: 0;
+}
+.cat-grid .cat-card[data-calm] .cat-card__name .tide__mark {
+  color: var(--ink);
+}
+.cat-grid .cat-card[data-calm] .cat-card__name .tide__glint {
+  animation: none;
+}
+
+/* the ghost: the plate's photo window in flight (a clone, fixed over everything, gone when it lands) */
+.cat-ghost {
+  position: fixed;
+  z-index: var(--cat-modal-z-ghost);
+  overflow: hidden;
+  isolation: isolate;
+  pointer-events: none;
+  will-change: transform, clip-path;
+  background-color: var(--page-alt);
+}
+.cat-ghost__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* — the ledger — */
+
+.cat-modal__head {
+  /* the right padding keeps a long name from running under the close button */
+  padding-right: 3.5rem;
+}
+.cat-modal__tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* the body: the story on the left, the sounding column on the right from sm (it lies on its side under it on a phone) */
+.cat-modal__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 640px) {
+  .cat-modal__cols {
+    grid-template-columns: minmax(0, 1fr) 9.5rem;
+    gap: 2rem;
+  }
+}
+
+.cat-modal__h4 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* the product line: numbered rows between hairlines */
+.cat-lines {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+.cat-lines__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.875rem;
+  padding-block: 0.625rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cat-lines__n {
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+/* the specifications: a ledger, label on the left and the reading on the right from sm */
+.cat-ledger {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+.cat-ledger__row {
+  padding-block: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.cat-ledger__dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+.cat-ledger__dd {
+  margin-top: 0.125rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+@media (min-width: 640px) {
+  .cat-ledger__row {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+  }
+  .cat-ledger__dd {
+    margin-top: 0;
+  }
+}
+
+/* the performance features: numbered, one hairline between */
+.cat-feats__row {
+  display: flex;
+  gap: 0.875rem;
+  padding-block: 0.625rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+.cat-feats__row:last-child {
+  border-bottom: 0;
+}
+
+/*
+ * The sounding column: the water the lure works in, from the surface down, the part of it this
+ * category works in lit. Logarithmic (lib/config/depth.ts), ticked at 0, 10, 100 and 400 ft. On a
+ * phone it lies on its side under the story; from sm it stands beside it.
+ */
+.cat-sound {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  /* room for the first and last tick labels, which are centred on their ticks */
+  padding-inline: 1.25rem;
+}
+.cat-sound__reading {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.cat-sound__reading small {
+  display: block;
+  margin-bottom: 0.125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+.cat-sound__track {
+  position: relative;
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--water) 36%, var(--page)),
+    color-mix(in srgb, var(--water-deep) 52%, var(--page))
+  );
+}
+.cat-sound__range {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--g0) * 100%);
+  width: calc((var(--g1) - var(--g0)) * 100%);
+  border-radius: 0.25rem;
+  background: linear-gradient(to right, var(--water-mid), var(--water-deep));
+  /* a rim of page, then one line of the accent: the lit part stands off the column without a glow */
+  box-shadow:
+    0 0 0 2px var(--page),
+    0 0 0 3px var(--accent);
+  --sx0: 0;
+  --sy0: 1;
+
+  transform-origin: 0 0;
+}
+.cat-sound__tick {
+  position: absolute;
+  top: 100%;
+  left: calc(var(--t) * 100%);
+  width: 1px;
+  height: 0.4rem;
+  background: var(--ink-muted);
+}
+.cat-sound__tick-label {
+  position: absolute;
+  top: calc(100% + 0.1rem);
+  left: 0;
+  translate: -50% 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+@media (min-width: 640px) {
+  .cat-sound {
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0;
+  }
+  .cat-sound__track {
+    flex: none;
+    width: 0.5rem;
+    height: 12.5rem;
+    margin-block: 0.25rem;
+    margin-left: 0.25rem;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--water) 36%, var(--page)),
+      color-mix(in srgb, var(--water-deep) 52%, var(--page))
+    );
+  }
+  .cat-sound__range {
+    top: calc(var(--g0) * 100%);
+    right: -3px;
+    bottom: auto;
+    left: -3px;
+    width: auto;
+    height: calc((var(--g1) - var(--g0)) * 100%);
+    background: linear-gradient(to bottom, var(--water-mid), var(--water-deep));
+    --sx0: 1;
+    --sy0: 0;
+  }
+  .cat-sound__tick {
+    top: calc(var(--t) * 100%);
+    left: 100%;
+    width: 0.4rem;
+    height: 1px;
+  }
+  .cat-sound__tick-label {
+    top: 0;
+    left: calc(100% + 0.15rem);
+    translate: 0 -50%;
+  }
+}
+
+/* — the motion, what it leaves in the page — */
+
+@keyframes cat-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cat-sheet-out {
+  to {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.99);
+  }
+}
+@keyframes cat-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cat-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes cat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.875rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cat-sound-draw {
+  from {
+    transform: scale(var(--sx0), var(--sy0));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cat-modal[data-motion] .cat-modal__panel {
+    animation: cat-sheet-in 400ms var(--ease-out) both;
+  }
+  .cat-modal[data-motion] .cat-modal__scrim {
+    animation: cat-scrim-in 320ms ease-out both;
+  }
+  /* the real photo waits for the ghost to land on it; the ledger waits for the photo */
+  .cat-modal[data-morph]:not([data-landed]) .cat-modal__photo,
+  .cat-modal[data-morph]:not([data-landed]) [data-rise] {
+    opacity: 0;
+  }
+  .cat-modal[data-landed] [data-rise] {
+    animation: cat-rise 560ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+  .cat-modal[data-landed] .cat-sound__range {
+    animation: cat-sound-draw 760ms var(--ease-out) 260ms both;
+  }
+  /* out: about 65% of the time in */
+  .cat-modal[data-closing] .cat-modal__panel {
+    animation: cat-sheet-out 240ms ease-in both;
+  }
+  .cat-modal[data-closing] .cat-modal__scrim {
+    animation: cat-scrim-out 260ms ease-in both;
+  }
+  /* the photo has left as a ghost, back to its plate */
+  .cat-modal[data-closing][data-ghosting] .cat-modal__photo {
+    opacity: 0;
+  }
+
+  /*
+   * The whole-plate morph (data-morph): the shell is the panel while it flies, so the panel has no entrance
+   * of its own; it waits unseen until the shell lands on its box, and is shown in that frame. On the way out
+   * the ledger fades first, then the panel goes in the frame the shell takes its place (data-ghosting), and
+   * the scrim lifts while the shell flies back into the plate.
+   */
+  .cat-modal[data-morph] .cat-modal__panel,
+  .cat-modal[data-morph][data-closing] .cat-modal__panel {
+    animation: none;
+  }
+  .cat-modal[data-morph]:not([data-landed]) .cat-modal__panel,
+  .cat-modal[data-morph][data-ghosting] .cat-modal__panel {
+    opacity: 0;
+  }
+  .cat-modal[data-morph][data-closing] [data-rise] {
+    animation: cat-fade-out 140ms ease-in both;
+  }
+  .cat-modal[data-morph][data-closing] .cat-modal__scrim {
+    animation: cat-scrim-out 380ms ease-in 140ms both;
+  }
+}
+@keyframes cat-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .cat-modal__panel {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+  .cat-ghost {
+    display: none;
+  }
+  .cat-sound__range {
+    background: Highlight;
+    box-shadow: none;
+  }
+}

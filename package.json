@@ -10,7 +10,10 @@
     "design:lint": "node scripts/design-check.mjs",
     "design:sweep": "node scripts/design-sweep.mjs",
     "design:check": "npm run design:lint && npm run design:sweep -- --build",
-    "fish:sim": "node scripts/fish-sim.mjs"
+    "fish:sim": "node scripts/fish-sim.mjs",
+    "test:ui": "playwright test",
+    "test:ui:fluency": "playwright test e2e/fluency.spec.ts",
+    "test:ui:report": "playwright show-report e2e/.report"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -20,6 +23,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

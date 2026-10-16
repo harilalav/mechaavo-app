@@ -7,10 +7,10 @@
  *   node docs/make-category-images.mjs jig-head   one
  *   node docs/make-category-images.mjs --sheet out.jpg   also write a contact sheet to look at
  *
- * Each photo is cropped to 2:1 around its subject, turned to plain grayscale and has its levels
- * stretched, at 1600 x 800. The colour is not in the file: src/styles/categories.css tints it with the
- * brand tokens (multiply onto --color-primary, a lift of white), exactly as the water footage is
- * (docs/media-credits.md), so the photos carry no colour of their own and the eight stay one set.
+ * Each photo is cropped to 2:1 around its subject and has its levels stretched, at 1600 x 800, **in its own
+ * colour**. (Until 2026-10-16 it was turned to grayscale here and tinted blue in the CSS, so the eight stood as
+ * one set; the client asked why the products were being tinted and grey, and they are now shown as they are.
+ * Like the logo, a product photo is the one asset that keeps its own colours: the CSS never touches it.)
  *
  * To use the client's own product photo for a category: put it in docs/category-sources/<id>.jpg
  * (replacing the stock one), set where to look in it below (`zoom`, `x`, `y`, and `rotate` to lay a
@@ -45,7 +45,8 @@ const CATEGORIES = {
 };
 
 function sourceOf(id) {
-  for (const ext of ["jpg", "jpeg", "png"]) {
+  // a png wins over a jpg: the AI-generated originals are saved as png (docs/generate-category-images.mjs)
+  for (const ext of ["png", "jpg", "jpeg"]) {
     const file = path.join(SOURCES, `${id}.${ext}`);
     if (existsSync(file)) return file;
   }
@@ -69,7 +70,6 @@ async function make(id) {
   await image
     .extract(region)
     .resize(WIDTH, HEIGHT, { fit: "fill" })
-    .grayscale()
     .normalise({ lower: 1, upper: 99 })
     .jpeg({ quality: 76, mozjpeg: true })
     .toFile(file);

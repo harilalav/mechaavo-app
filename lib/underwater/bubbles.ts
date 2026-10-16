@@ -6,6 +6,11 @@ import { createRng, range, TAU, type Rng } from "./rng";
  * bite, a release, a rod-tip twitch or the lure's entry into the water releases
  * some, and they then rise (or fade) on their own clock. A pool of fixed size is
  * reused, so nothing allocates per frame.
+ *
+ * Two looks. The default is the bite's: a clear sphere with a rim, a hairline and two
+ * glints, loud on purpose. `fine` is the quiet one (a faint body, one thin rim, one
+ * glint) for the lure's dive in and the tiles' arrival, where a crowd of the loud
+ * ones read as stickers.
  */
 
 interface Bubble {
@@ -21,6 +26,8 @@ interface Bubble {
   phase: number;
   /** How quickly sideways and vertical speed die away, 1/s (zero for a bubble that just rises). */
   drag: number;
+  /** The quiet look (see the header). */
+  fine: boolean;
 }
 
 interface Ripple {
@@ -30,7 +37,7 @@ interface Ripple {
   age: number;
 }
 
-/** The splash where the lure enters the water: two soft rings and a fan of droplets. */
+/** The splash where the lure enters the water: two soft rings. */
 interface Splash {
   active: boolean;
   x: number;
@@ -40,47 +47,30 @@ interface Splash {
   scale: number;
 }
 
-/** One fleck of spray from the splash: thrown outward, slowed by the water. */
-interface Fleck {
-  active: boolean;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  radius: number;
-  age: number;
-  life: number;
-}
-
 export interface BubblePool {
   bubbles: Bubble[];
   ripples: Ripple[];
   splash: Splash;
-  flecks: Fleck[];
   rng: Rng;
   cursor: number;
 }
 
 const RIPPLE_LIFE = 1.1;
 const SPLASH_LIFE = 1.0;
-const FLECKS = 12;
 
 export function createBubblePool(capacity: number, seed: number): BubblePool {
   const bubbles: Bubble[] = [];
   for (let i = 0; i < capacity; i++) {
-    bubbles.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, radius: 1, age: 0, life: 1, wobble: 0, phase: 0, drag: 0 });
+    bubbles.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, radius: 1, age: 0, life: 1, wobble: 0, phase: 0, drag: 0, fine: false });
   }
   const ripples: Ripple[] = [
     { active: false, x: 0, y: 0, age: 0 },
     { active: false, x: 0, y: 0, age: 0 },
   ];
-  const flecks: Fleck[] = [];
-  for (let i = 0; i < FLECKS; i++) flecks.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, radius: 1, age: 0, life: 1 });
   return {
     bubbles,
     ripples,
     splash: { active: false, x: 0, y: 0, age: 0, scale: 1 },
-    flecks,
     rng: createRng(seed),
     cursor: 0,
   };
@@ -110,6 +100,41 @@ export function emitBubbles(
     b.wobble = range(pool.rng, 4, 10);
     b.phase = range(pool.rng, 0, TAU);
     b.drag = 0;
+    b.fine = false;
+  }
+}
+
+/**
+ * The quiet bubbles: `count` of them around (x, y), mostly tiny with the odd larger one
+ * (a cube of the random draw, so a crowd is never a row of equals), each on its own
+ * release time, with little sideways wobble. `size` is the typical radius in px.
+ * Used where a trail should read as water, not as a sticker sheet.
+ */
+export function emitFine(
+  pool: BubblePool,
+  x: number,
+  y: number,
+  count: number,
+  spread: number,
+  rise: number,
+  size: number,
+): void {
+  for (let i = 0; i < count; i++) {
+    const b = pool.bubbles[pool.cursor];
+    pool.cursor = (pool.cursor + 1) % pool.bubbles.length;
+    const r = pool.rng();
+    b.active = true;
+    b.x = x + range(pool.rng, -spread, spread);
+    b.y = y + range(pool.rng, -spread * 0.5, spread * 0.5);
+    b.vx = range(pool.rng, -3, 3);
+    b.vy = -rise * range(pool.rng, 0.5, 1.2);
+    b.radius = size * (0.5 + 1.9 * r * r * r);
+    b.age = -range(pool.rng, 0, 0.5);
+    b.life = range(pool.rng, 1.1, 2.0);
+    b.wobble = range(pool.rng, 1.5, 4.5);
+    b.phase = range(pool.rng, 0, TAU);
+    b.drag = 0;
+    b.fine = true;
   }
 }
 
@@ -151,6 +176,7 @@ export function emitStream(
     b.life = range(pool.rng, 2.8, 4.2);
     b.wobble = range(pool.rng, 3, 8);
     b.phase = range(pool.rng, 0, TAU);
+    b.fine = false;
   }
 }
 
@@ -164,9 +190,10 @@ export function emitRipple(pool: BubblePool, x: number, y: number): void {
 
 /**
  * The lure goes into the water at (x, y): two quick rings open out from the
- * point of entry and a small fan of spray is thrown downward and outward, then
- * everything fades within a second. Small and soft on purpose; it happens once.
- * `scale` sizes it to the lure (1 is about 140 px across at its widest).
+ * point of entry and fade within a second. Small and soft on purpose; it happens
+ * once. (It used to throw a fan of white droplets as well; with the bubbles they
+ * made the entry a crowd.) `scale` sizes it to the lure (1 is about 140 px across
+ * at its widest).
  */
 export function emitSplash(pool: BubblePool, x: number, y: number, scale: number): void {
   pool.splash.active = true;
@@ -174,26 +201,12 @@ export function emitSplash(pool: BubblePool, x: number, y: number, scale: number
   pool.splash.y = y;
   pool.splash.age = 0;
   pool.splash.scale = scale;
-  for (const fleck of pool.flecks) {
-    // a fan below the entry point (the surface is above the frame), wide enough to read as a burst
-    const angle = Math.PI / 2 + range(pool.rng, -1.25, 1.25);
-    const speed = range(pool.rng, 70, 165) * scale;
-    fleck.active = true;
-    fleck.x = x;
-    fleck.y = y;
-    fleck.vx = Math.cos(angle) * speed;
-    fleck.vy = Math.sin(angle) * speed;
-    fleck.radius = range(pool.rng, 1.4, 2.8) * Math.sqrt(scale);
-    fleck.age = 0;
-    fleck.life = range(pool.rng, 0.5, 0.95);
-  }
 }
 
 export function clearBubbles(pool: BubblePool): void {
   for (const b of pool.bubbles) b.active = false;
   for (const r of pool.ripples) r.active = false;
   pool.splash.active = false;
-  for (const f of pool.flecks) f.active = false;
 }
 
 /** Advance the pool. `streamX` is the water's sideways speed at the lure (px/s): rising bubbles are carried along with it. */
@@ -224,19 +237,6 @@ export function updateBubbles(pool: BubblePool, dt: number, streamX = 0): void {
     pool.splash.age += dt;
     if (pool.splash.age >= SPLASH_LIFE) pool.splash.active = false;
   }
-  const drag = Math.exp(-2.6 * dt);
-  for (const f of pool.flecks) {
-    if (!f.active) continue;
-    f.age += dt;
-    if (f.age >= f.life) {
-      f.active = false;
-      continue;
-    }
-    f.vx *= drag;
-    f.vy *= drag;
-    f.x += f.vx * dt;
-    f.y += f.vy * dt;
-  }
 }
 
 /** Draw the pool. `scale` follows the lure's size so effects stay in proportion while the camera pushes in. */
@@ -251,20 +251,21 @@ export function drawBubbles(
     const t = r.age / RIPPLE_LIFE;
     const fade = (1 - t) * (1 - t);
     ctx.lineWidth = 1.6;
-    ctx.strokeStyle = palette.alpha("primary", 0.5 * fade);
+    // rings on ocean water (D12): a navy shade, then a pale echo
+    ctx.strokeStyle = palette.alpha("seaDeep", 0.5 * fade);
     ctx.beginPath();
     ctx.arc(r.x, r.y, (10 + 130 * t) * scale, 0, TAU);
     ctx.stroke();
     if (t > 0.12) {
       const t2 = (t - 0.12) / 0.88;
-      ctx.strokeStyle = palette.alpha("accentSecondary", 0.4 * (1 - t2) * (1 - t2));
+      ctx.strokeStyle = palette.alpha("white", 0.55 * (1 - t2) * (1 - t2));
       ctx.beginPath();
       ctx.arc(r.x, r.y, (8 + 90 * t2) * scale, 0, TAU);
       ctx.stroke();
     }
   }
 
-  // the splash: two rings opening out from the point of entry, then the spray
+  // the splash: two rings opening out from the point of entry
   const splash = pool.splash;
   if (splash.active) {
     const t = splash.age / SPLASH_LIFE;
@@ -274,50 +275,86 @@ export function drawBubbles(
     ctx.beginPath();
     ctx.arc(splash.x, splash.y, radius, 0, TAU);
     ctx.lineWidth = 3.4 - 2 * t;
-    ctx.strokeStyle = palette.alpha("secondary", 0.2 * fade);
+    ctx.strokeStyle = palette.alpha("seaDeep", 0.16 * fade);
     ctx.stroke();
     ctx.lineWidth = 2.2 - 1.2 * t;
-    ctx.strokeStyle = palette.alpha("white", 0.95 * fade);
+    ctx.strokeStyle = palette.alpha("white", 0.75 * fade);
     ctx.stroke();
-    // the second, a beat later and tighter, in the brand blue
+    // the second, a beat later and tighter, in the logo's blue (the lure swims in from the logo)
     if (t > 0.12) {
       const t2 = (t - 0.12) / 0.88;
       ctx.lineWidth = 1.8 - 1 * t2;
-      ctx.strokeStyle = palette.alpha("primary", 0.75 * (1 - t2) * (1 - t2));
+      ctx.strokeStyle = palette.alpha("brandBlue", 0.4 * (1 - t2) * (1 - t2));
       ctx.beginPath();
       ctx.arc(splash.x, splash.y, (5 + 48 * Math.pow(t2, 0.6)) * splash.scale, 0, TAU);
       ctx.stroke();
     }
   }
-  for (const f of pool.flecks) {
-    if (!f.active) continue;
-    const t = f.age / f.life;
-    const fade = (1 - t) * Math.min(1, f.age * 12);
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, f.radius, 0, TAU);
-    ctx.fillStyle = palette.alpha("white", 0.9 * fade);
-    ctx.fill();
-    ctx.strokeStyle = palette.alpha("secondary", 0.45 * fade);
-    ctx.lineWidth = 0.9;
-    ctx.stroke();
-  }
-
   ctx.lineWidth = 1;
   for (const b of pool.bubbles) {
     if (!b.active || b.age < 0) continue;
     const t = b.age / b.life;
     const envelope = Math.min(1, t * 6) * Math.min(1, (1 - t) * 3);
-    const radius = b.radius * scale * (0.8 + 0.5 * t);
+    if (b.fine) {
+      // the quiet look: a faint body, one thin rim (a hair of navy beside it only where it is big enough to
+      // carry one), one glint. Smaller than a pixel is a speck, so the floor is a pixel and a tenth.
+      const r = Math.max(1.1, b.radius * scale * (0.85 + 0.35 * t));
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, r, 0, TAU);
+      ctx.fillStyle = palette.alpha("white", 0.12 * envelope);
+      ctx.fill();
+      if (r >= 2.2) {
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = palette.alpha("seaDeep", 0.16 * envelope);
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, r + 0.5, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 0.8;
+      ctx.strokeStyle = palette.alpha("white", 0.7 * envelope);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, Math.max(0.6, r - 0.3), 0, TAU);
+      ctx.stroke();
+      if (r >= 1.8) {
+        ctx.beginPath();
+        ctx.arc(b.x - r * 0.35, b.y - r * 0.35, Math.max(0.5, r * 0.18), 0, TAU);
+        ctx.fillStyle = palette.alpha("white", 0.85 * envelope);
+        ctx.fill();
+      }
+      continue;
+    }
+    // never smaller than a pixel and a half: a bubble that is only a speck is not a bubble
+    const radius = Math.max(1.5, b.radius * scale * (0.8 + 0.5 * t));
+    // a clear sphere on blue water (D12): a faint milky body, a bright rim with a navy hairline outside it (the
+    // rim alone is lost against the pale surface water, the hairline alone against the deep), and two glints
     ctx.beginPath();
     ctx.arc(b.x, b.y, radius, 0, TAU);
-    ctx.fillStyle = palette.alpha("white", 0.32 * envelope);
+    ctx.fillStyle = palette.alpha("white", 0.16 * envelope);
     ctx.fill();
-    ctx.strokeStyle = palette.alpha("secondary", 0.42 * envelope);
-    ctx.stroke();
-    // a pinpoint of light on the upper left
+    // the navy hairline only for a bubble big enough to have one (a few pixels across it is a dot, and the
+    // trail of a dive is hundreds of them: fewer paths per frame)
+    if (radius >= 2.6) {
+      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = palette.alpha("seaDeep", 0.42 * envelope);
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, radius + 0.6, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = palette.alpha("white", 0.92 * envelope);
     ctx.beginPath();
-    ctx.arc(b.x - radius * 0.35, b.y - radius * 0.35, Math.max(0.5, radius * 0.18), 0, TAU);
-    ctx.fillStyle = palette.alpha("white", 0.9 * envelope);
+    ctx.arc(b.x, b.y, Math.max(0.8, radius - 0.4), 0, TAU);
+    ctx.stroke();
+    // a pinpoint of light on the upper left, and a fainter one opposite it where the light comes through
+    ctx.beginPath();
+    ctx.arc(b.x - radius * 0.35, b.y - radius * 0.35, Math.max(0.6, radius * 0.2), 0, TAU);
+    ctx.fillStyle = palette.alpha("white", 0.95 * envelope);
     ctx.fill();
+    if (radius >= 2.6) {
+      ctx.beginPath();
+      ctx.arc(b.x + radius * 0.4, b.y + radius * 0.4, Math.max(0.5, radius * 0.12), 0, TAU);
+      ctx.fillStyle = palette.alpha("white", 0.5 * envelope);
+      ctx.fill();
+    }
   }
 }

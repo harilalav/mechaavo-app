@@ -1,7 +1,8 @@
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SECTION_IDS } from "../config/sections";
-import { scrubSeconds } from "./scrub";
+import { handoverLine } from "../utils/handoverLine";
+import { scrubSeconds, sinkScrubSeconds } from "./scrub";
 import { LURE_ZOOM_GAIN } from "../hero/lureConfig";
 import { resetHeroScene, STORY, type HeroScene } from "../underwater/story";
 
@@ -13,12 +14,16 @@ export type { HeroScene } from "../underwater/story";
  * DOM (headline, rays, camera, the lure's push-in) and the shared `HeroScene`
  * the Canvas engine reads (camera zoom, attention).
  *
- * Nothing is pinned by JavaScript. The hero is `position: sticky` inside a tall
- * track (.hero-track, sized in src/styles/underwater.css), and this timeline is
- * scrubbed over that track's scroll distance, minus the last screen, which is
- * the next section sliding up over the hero. The timeline is 100 units long, so
- * every position below is a percentage of that distance. Scroll backwards and
- * everything reverses.
+ * Nothing is pinned by JavaScript. The hero is `position: sticky` inside its track
+ * (.hero-track, src/styles/underwater.css): the hero's own screen, a spacer the story is
+ * scrubbed over, and then the categories, which scroll up over the still-pinned hero
+ * (the hero is their live backdrop: the plates rise through its water, client review
+ * 2026-10-16). The story's length is `--hero-screens` minus two screens. The timeline is
+ * 100 units long, so every position below is a percentage of that distance. Scroll
+ * backwards and everything reverses.
+ *
+ * A second, shorter trigger plays while the categories come up: the camera sinks below
+ * the catch (`--sink` work below), and the statement, the captions and the lure leave.
  *
  * What it deliberately does NOT drive: the fish, the lure's own motion, and the
  * catch. The primary fish reads `scene.story` to choose what to do and then
@@ -44,6 +49,14 @@ export interface HeroTimelineOptions {
 
 interface HeroElements {
   bg: HTMLElement | null;
+  /** The shafts' own boxes (their beams are the ambient tweens'; these carry only the sinking). */
+  rayBoxes: HTMLElement[];
+  caustics: HTMLElement | null;
+  depth: HTMLElement | null;
+  /** What leaves as the camera sinks: boxes with no other owner of their opacity (the captions' container, the lure's fade wrapper, the hero's own nav). */
+  leaving: HTMLElement[];
+  /** The statement's slot: its own opacity is the catch's (data-caught), so it gets `--leave`, read by its fade wrapper and its wash. */
+  statementSlot: HTMLElement | null;
   rays: HTMLElement | null;
   beams: HTMLElement[];
   haze: HTMLElement | null;
@@ -60,6 +73,11 @@ function collect(root: HTMLElement): HeroElements {
     Array.from(root.querySelectorAll<HTMLElement>(`[data-hero="${key}"]`));
   return {
     bg: one("bg"),
+    rayBoxes: Array.from(root.querySelectorAll<HTMLElement>(".hero-ray")),
+    caustics: root.querySelector<HTMLElement>(".hero-caustics"),
+    depth: root.querySelector<HTMLElement>(".hero-depth"),
+    leaving: Array.from(root.querySelectorAll<HTMLElement>(".hero-captions, .hero-lure-fade, .hero-nav")),
+    statementSlot: root.querySelector<HTMLElement>(".hero-statement-slot"),
     rays: one("rays"),
     beams: all("beam"),
     haze: one("haze"),
@@ -119,32 +137,60 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
   gsap.from(el.canvases, { autoAlpha: 0, duration: 2.2, ease: "power2.out" });
 
   // ———————————————————————— ambient water (never static) ————————————————————————
-  // light shafts shimmer and sway on their own, out of phase with each other
+  // Light shafts sway and breathe on their own, out of phase with each other. They are a fraction of the
+  // hero wide, so a sway of a few percent of a shaft was about 10 px in 15 s (client review 2026-10-15:
+  // "the rays are so static"): now a shaft travels about half its own width and leans, over 7 to 17 s, and its
+  // brightness moves with three incommensurate beats like the current's gusts (current.ts), not one.
   el.beams.forEach((beam, i) => {
+    const dir = i % 2 ? 1 : -1;
+    gsap.fromTo(
+      beam,
+      { xPercent: -dir * 38, skewX: -dir * 3.5, rotation: -dir * 1.2 },
+      {
+        xPercent: dir * 38,
+        skewX: dir * 3.5,
+        rotation: dir * 1.2,
+        duration: 7 + i * 2,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+      },
+    );
     gsap.to(beam, {
-      xPercent: i % 2 ? 7 : -7,
-      skewX: i % 2 ? -2 : 2,
-      duration: 11 + i * 2.3,
-      ease: "sine.inOut",
-      yoyo: true,
-      repeat: -1,
-    });
-    gsap.to(beam, {
-      opacity: 0.55,
-      duration: 6 + i * 1.7,
+      opacity: 0.4,
+      duration: 3.2 + i * 1.3,
       ease: "sine.inOut",
       yoyo: true,
       repeat: -1,
     });
   });
+
+  // The light feels like it is in the water, not painted on the screen: on a fine pointer the shafts shift a
+  // little against the scene as the pointer moves (parallax: the light is nearer the surface than the fish).
+  // One passive listener, one write per frame, nothing on touch; reduced motion never builds this timeline.
+  let shaftFrame = 0;
+  let shaftShift = 0;
+  const onPointer = (event: PointerEvent) => {
+    shaftShift = (event.clientX / window.innerWidth - 0.5) * -28;
+    if (shaftFrame) return;
+    shaftFrame = requestAnimationFrame(() => {
+      shaftFrame = 0;
+      el.rays?.style.setProperty("--ray-shift", `${shaftShift.toFixed(1)}px`);
+    });
+  };
+  const finePointer = window.matchMedia("(pointer: fine)").matches;
+  if (finePointer && el.rays) window.addEventListener("pointermove", onPointer, { passive: true });
   if (el.haze) {
     gsap.to(el.haze, { xPercent: 2.5, duration: 24, ease: "sine.inOut", yoyo: true, repeat: -1 });
   }
 
   // ———————————————————————— the scrubbed story ————————————————————————
-  // The track holds the hero's own screen, the story, and one last screen for the
-  // curtain (the next section sliding over the hero); the story is what is left.
-  const storyDistance = () => Math.max(1, track.offsetHeight - 2 * root.offsetHeight);
+  // The track holds the hero's own screen, the spacer the story plays over and the categories after it, so its
+  // height is no measure of the story any more: the story is --hero-screens (underwater.css) less two screens.
+  const storyDistance = () => {
+    const screens = Number.parseFloat(getComputedStyle(track).getPropertyValue("--hero-screens")) || 3.9;
+    return Math.max(1, (screens - 2) * root.offsetHeight);
+  };
 
   const tl = gsap.timeline({
     defaults: { ease: "none" },
@@ -157,23 +203,97 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
     },
   });
 
-  // once the next section has slid all the way over the hero (its top edge at the top of the
-  // screen) the hero is hidden behind it for another screen of scrolling: let the engine rest
+  // the categories' ground turns to water only once this timeline runs: before it loads, or if it never does,
+  // they keep a white ground (categories.css), and the hero is not a backdrop
+  track.setAttribute("data-backdrop", "");
+
+  // once the categories have come up over the hero to the handover line (handoverLine.ts, where SiteNavigation
+  // shows the sticky bar) the hero is a backdrop: the engine keeps the water alive but
+  // cheaply and lets the catch go (engine.ts), and the keyboard goes to the bar's nav
   const sheet =
     document.getElementById(SECTION_IDS.categories) ||
     document.getElementById(SECTION_IDS.story);
+  const barLine = () => handoverLine(document.querySelector<HTMLElement>(".site-nav"));
   if (sheet) {
     ScrollTrigger.create({
       trigger: sheet,
-      start: "top top",
+      start: () => `top ${Math.round(barLine())}px`,
       end: "max",
+      invalidateOnRefresh: true,
       onToggle: (self) => {
-        scene.covered = self.isActive;
-        // and nothing under the sheet should take focus or clicks (the nav, the call to action)
+        scene.backdrop = self.isActive;
+        // and nothing behind the catalog takes focus or clicks (the hero nav, the call to action)
         root.toggleAttribute("inert", self.isActive);
       },
     });
   }
+
+  // the story section comes up over the hero once the catalog has ended (underwater.css, the track's last
+  // screen): when it covers the whole of it, the engine rests
+  const story = document.getElementById(SECTION_IDS.story);
+  if (story) {
+    ScrollTrigger.create({
+      trigger: story,
+      start: "top top",
+      end: "max",
+      invalidateOnRefresh: true,
+      onToggle: (self) => {
+        scene.covered = self.isActive;
+      },
+    });
+  }
+
+  // ———————————————————————— the camera sinks under the catalog ————————————————————————
+  // While the categories come up (from their top entering the screen, over one screen of scroll: a fixed length,
+  // so it never depends on how tall the catalog is) the camera sinks below the catch: the shafts drift up and
+  // thin, the caustic light drifts up, a deeper water gathers, and what belonged to the catch (the statement,
+  // the captions, the lure) leaves by opacity alone (no motion on text). One number, `sink`, written to
+  // properties nothing else animates: each shaft's own `translate` and `opacity` (the beams inside are the
+  // ambient tweens'), the caustics' `translate`, the new depth layer's and the fade wrappers' `opacity`.
+  const sinking = { v: 0 };
+  const writeSink = () => {
+    const v = sinking.v;
+    scene.sink = v;
+    // the hero's words, nav and lure are gone by a third of the way in (they are dark ink: they must not be
+    // over the deepening water), and the deep arrives over the next third, so the white heading that rises
+    // into it has water it can be read on
+    const leave = String(Math.min(1, Math.max(0, 1 - v * 2.8)));
+    for (const ray of el.rayBoxes) {
+      ray.style.translate = `0 ${(-v * 14).toFixed(2)}svh`;
+      ray.style.opacity = String(1 - 0.6 * v);
+    }
+    if (el.caustics) el.caustics.style.translate = `0 ${(-v * 10).toFixed(2)}svh`;
+    if (el.depth) {
+      const t = Math.min(1, Math.max(0, (v - 0.1) / 0.4));
+      el.depth.style.opacity = String((0.92 * t * t * (3 - 2 * t)).toFixed(3));
+    }
+    for (const node of el.leaving) node.style.opacity = leave;
+    el.statementSlot?.style.setProperty("--leave", leave);
+  };
+  const sink = sheet
+    ? gsap.to(sinking, {
+        v: 1,
+        ease: "none",
+        onUpdate: writeSink,
+        scrollTrigger: {
+          trigger: sheet,
+          start: "top bottom",
+          end: () => `+=${window.innerHeight}`,
+          scrub: sinkScrubSeconds(),
+          invalidateOnRefresh: true,
+        },
+      })
+    : null;
+
+  // A jump straight to a section (the hero's call to action, the nav) lands under the veil
+  // (lib/animations/sectionJump.ts): bring both scrubs to where the page now is at once, so the catch, the
+  // reel and the statement do not play out behind the glass plates after the veil has lifted.
+  const onJump = () => {
+    ScrollTrigger.update();
+    tl.scrollTrigger?.getTween()?.progress(1);
+    sink?.scrollTrigger?.getTween()?.progress(1);
+  };
+  window.addEventListener("section-jump", onJump);
 
   // master clock: gives the timeline its 100-unit length; the fish read it to choose what to do
   tl.to(scene, { story: 1, duration: 100 }, 0);
@@ -254,7 +374,19 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
   }
 
   return () => {
+    window.removeEventListener("pointermove", onPointer);
+    window.removeEventListener("section-jump", onJump);
+    if (shaftFrame) cancelAnimationFrame(shaftFrame);
     root.removeAttribute("inert");
+    track.removeAttribute("data-backdrop");
+    for (const ray of el.rayBoxes) {
+      ray.style.removeProperty("translate");
+      ray.style.removeProperty("opacity");
+    }
+    el.caustics?.style.removeProperty("translate");
+    el.depth?.style.removeProperty("opacity");
+    for (const node of el.leaving) node.style.removeProperty("opacity");
+    el.statementSlot?.style.removeProperty("--leave");
     resetHeroScene(scene);
   };
 }

@@ -20,7 +20,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | 4 | Redesign mode and audit | greenfield with a locked brand; n/a | n/a |
 | 5 | Zero em dashes | hyphen, comma or two sentences | lint:dash, G9 |
 | 6 | Page theme lock | one white theme, no inverted section (the story water is a tint of the same theme) | D4, plan |
-| 7 | Colour consistency lock | eight tokens through roles; compiled CSS holds only the token hexes | lint:raw-color, final CSS sweep in verification.md |
+| 7 | Colour consistency lock | the client's eight tokens through roles, plus four for water and fish only (D12); compiled CSS holds only the token hexes | lint:raw-color, lint:sea-scope, final CSS sweep in verification.md |
 | 8 | Shape consistency lock | square page; rounded categories family | D7, plan |
 | 9 | Button contrast | ink on the blue plate 8:1; white on dark ink button | LH (color-contrast), pixel sampling for text on glass |
 | 10 | CTA never wraps | `white-space: nowrap` | G3 |
@@ -54,7 +54,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | 38 | No floating top-right sub-text | none | plan |
 | 39 | No scoring bars | none | plan |
 | 40 | No locale or weather strips | none | plan |
-| 41 | No scroll cues | the preview subtitle is brief-supplied | D6 |
+| 41 | No scroll cues | the preview card and its scroll-cue subtitle were removed 2026-10-15 | D6 |
 | 42 | No version labels in the hero | "System 01" is brief-supplied | D6 |
 | 43 | No section-numbering eyebrows | "System 0N" is brief-supplied | D6 |
 | 44 | No decorative dots | the badge dot is brief-supplied | D6 |
@@ -84,7 +84,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | Rule | Here | Enforced by |
 |---|---|---|
 | color-contrast, color-accessible-pairs, contrast-readability | 4.5:1 text, 3:1 large and UI | LH, pixel sampling |
-| focus-states | 2 px ink ring (white on footage) | G11 |
+| focus-states | 2 px ink ring (white on a dark ground) | G11 |
 | alt-text | every `img` has `alt` (empty when decorative) | G15, LH |
 | aria-labels, icon-context | Phosphor icons `aria-hidden`, controls named | LH, plan |
 | keyboard-nav | Tab order is DOM order, all controls reachable | G11 |
@@ -100,7 +100,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | focus-not-obscured | nothing sticky over focus | G11 |
 | focus-not-obscured-enhanced, focus-appearance (AAA) | not targeted | n/a |
 | web-target-size | 24 px pointer, 44 px touch | G4 |
-| auto-rotation-controls | looping video has a pause control; loops stop under reduced motion | G15, G8 |
+| auto-rotation-controls | no video on the site; the hero's ambient loops stop under reduced motion | G15, G8 |
 
 ### 2. Touch and interaction (critical)
 
@@ -128,7 +128,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | progressive-loading | poster, plain layout | plan |
 | input-latency, tap-feedback-speed | INP under 200 ms | LH |
 | debounce-throttle | no scroll or resize handlers | lint:scroll-listener |
-| network-fallback | data-saver gets the lightest video (`lib/config/media.ts`) | plan |
+| network-fallback | the category photos are fetched only when the section is near (`useNearViewport`) | plan |
 
 ### 4. Style selection
 
@@ -156,7 +156,7 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | container-width | `.page-container` | G14 |
 | z-index-management | tokens only | lint:z-literal |
 | fixed-element-offset | no fixed bars except the dialog | G3, G11 |
-| scroll-behavior | nested scroll only in dialogs: nothing in the pinned categories card scrolls by itself, its content slides under the page's scroll; the last tile can be brought on screen | G3, G17 |
+| scroll-behavior | nested scroll only in dialogs: nothing in the categories section scrolls by itself (it is an ordinary section: the page scrolls through it); the last tile can be brought on screen | G3, G17 |
 | viewport-units | `svh`, `dvh`, never `vh` | lint:vh-unit |
 | orientation-support | landscape screens in the matrix | G3 |
 | content-priority | the lede folds away on phones | plan |
@@ -182,9 +182,9 @@ This is the cross-verification, done once. Each taste pre-flight item (Section 1
 | Rule | Here | Enforced by |
 |---|---|---|
 | transform-performance, layout-shift-avoid | transform and opacity only | lint:anim-layout, G7 |
-| duration-timing, easing, motion-consistency, exit-faster-than-enter, stagger-sequence | shared tokens, one easing | plan |
+| duration-timing, easing, motion-consistency, exit-faster-than-enter, stagger-sequence | shared tokens, one easing (plus `--ease-fade` for fades of light and shadow, D15) | plan |
 | excessive-motion, motion-meaning, hierarchy-motion | one sentence per animation | plan |
-| state-transition, fade-crossfade, scale-feedback, opacity-threshold, modal-motion, shared-element-transition, continuity | the dialog opens from its tile, the sheet curtains over the hero | plan |
+| state-transition, fade-crossfade, scale-feedback, opacity-threshold, modal-motion, shared-element-transition, continuity | the whole plate grows into the dialog and shrinks back (`categoryInspector.ts`, the shell), the catalog rises through the pinned hero's water (D16) | `npm run test:ui` |
 | parallax-subtle, spring-physics | engine physics; reduced motion removes the track | G8 |
 | interruptible, no-blocking-animation, cancellable-state-transitions | scrubs reverse; nothing blocks input | plan |
 | loading-states | poster stands in | plan |
@@ -203,7 +203,7 @@ All form rules (input-labels, error-placement, submit-feedback, required-indicat
 | navigation-consistency | one nav, one place | G2 |
 | deep-linking | every section has an id and a link; a jump dips through a white veil (`SectionJumps`), the URL hash still updates | lint:link-unique, plan |
 | modal-escape, modal-vs-navigation | the dialog is an inspector, closes with Escape, X and scrim | G3, plan |
-| persistent-nav | the hero nav while the hero is pinned, a slim sticky bar (`SiteNavigation`) from #story on; it steps aside for the hero and the full-screen categories stage | D11 |
+| persistent-nav | the hero nav while the hero is pinned, a slim sticky bar (`SiteNavigation`) from the moment the categories, rising over the pinned hero, reach it; the hero is `inert` on the same line, so one nav is exposed at a time | D11 |
 | nav-state-active, nav-hierarchy, state-preservation, back-behavior, back-stack-integrity, gesture-nav-support, avoid-mixed-patterns | single route; anchors; one nav in two states (hero nav, then the sticky bar), never both exposed | plan |
 | bottom-nav-limit, bottom-nav-top-level, drawer-usage, tab-bar-ios, top-app-bar-android, search-accessible, breadcrumb-web, tab-badge, destructive-nav-separation, empty-nav-state, focus-on-route-change | no such patterns | n/a |
 
@@ -230,14 +230,42 @@ All chart rules: **n/a, the site has no charts.**
 | Decorative icons hidden, images have alternatives, icon controls named | Phosphor `aria-hidden`; `alt` | G15, LH |
 | Sticky UI does not obscure focus | none sticky except the dialog close | G11 |
 | Dragging, authentication, forms | none | n/a |
-| Auto-rotating content stops and has controls | video pause, loops end under reduced motion | G15, G8 |
+| Auto-rotating content stops and has controls | no video; ambient loops end under reduced motion | G15, G8 |
 
 ## Added with the hero, categories and page-foot pass (2026-10-04)
 
 | Rule | Where it lands | Check |
 |---|---|---|
-| scroll budget: the scroll between the bite and the catalog stays short (lift 0.4, sheet 2.4, catalog 0.75 screens) | `STORY`, `--hero-screens`, `--cat-screens` | G16 |
-| viewport units: a pinned stage paints to `lvh`, lays out against `svh` | `.cat-stage`, `.cat-view` | manual on a device (headless Chrome has no toolbars), geometry by simulation |
+| scroll budget: the scroll between the bite and the categories stays short (lift 0.4, sheet edge 0.75, first tile row 1.2, all eight tiles 1.8 screens) | `STORY`, `--hero-screens`, `--sheet-lead` | G16, `npm run test:ui` |
+| viewport units: the pinned hero lays out against `svh` (the categories are an in-flow `min-height: 100svh` section) | `.hero-root`, `.cat-section` | manual on a device (headless Chrome has no toolbars), geometry by simulation |
 | natural motion: heading follows the swim direction, turn rate under the cap, few head flips, clear of the lure | `primaryFish.ts` patrol and circle | `npm run fish:sim` |
 | tile photos: decoration inside a tile (`alt=""`), described in the inspector; graded by tokens; never behind text | `CATEGORY_MEDIA`, `.cat-card__photo` | G15, G5, G3 |
 | contact details are real before launch | `lib/config/contact.ts` | lint:contact-placeholder (warn, `--strict` fails) |
+| the site's live address is set before launch (sitemap, robots, share image, structured data; no canonical until then) | `lib/config/site.ts` | lint:site-placeholder (warn, `--strict` fails) |
+| the water is the client's ocean (azure to navy) and the fish Mechaavo blue; the copy keeps AA on them | `--water`, `--water-mid`, `--water-deep`, `--fish`, `renderFish.ts` `STYLES` | `npm run test:ui` (hue of the water alone and of the fish alone, per-pixel contrast of the copy and of the captions through the story), lint:sea-scope |
+| the water and fish tokens never colour text or leave the water and fish files | `src/styles/theme.css`, `roles.css` | lint:sea-scope |
+| section rhythm is two tokens and a big screen's root grows with it | `--section-y`, `--block-gap`, `html { font-size }` | `npm run test:ui` (largest empty band, section joins, 4K root and column), G2 (nav cap in rem) |
+| the categories arrive (plates rise, the photo window drains, the ruler draws): time-based, once, interruptible, never held out of the tab order, every fallback shows the tiles | `categoriesReveal.ts`, `bubbleOverlay.ts`, `categories.css` | G11, G16, G17, `npm run test:ui` |
+| frame pacing: smooth through the hero, the handover and the rest of the page (soft budgets), CLS 0 | `e2e/fluency.spec.ts` | `npm run test:ui:fluency` |
+| heading plates: an ink label with white type and one accent edge, 9 to 18:1 against every ground | `--plate-bg`, `--plate-ink`, `--plate-edge` in `tide.css` | `npm run test:ui` (type on plate, plate against the ground behind it, hero and white page) |
+| the hero's ambient light is alive (shafts sway and glint, caustic lace, pointer parallax) and stills under reduced motion | `heroTimeline.ts`, `underwater.css` (`hero-ray-glint`, `.hero-caustics`) | `npm run test:ui` (shafts move, glint animation, reduced motion still), D13 |
+| the lure's dive leaves a visible trail of bubbles | `engine.ts` (screen-sized radius), `bubbles.ts` | `npm run test:ui` (arc counter on the hero canvases, diving vs settled) |
+| the lure's dive leaves a thin, irregular thread of fine bubbles, never a crowd (client review 2026-10-16) | `engine.ts` (`diveWait`, `emitFine`), `bubbles.ts` (`fine` look, no flecks) | `npm run test:ui` (the dive draws more than the settled water and less than +75 arcs a frame) |
+| no sheet and no swell: the catalog scrolls over the pinned hero, its live backdrop (camera sinks, catch eases out, engine capped), white plates (an opt-in glass variant); reduced motion and no script: a still hero, white catalog | `MechaavoHero.tsx` (spacer, tail), `underwater.css`, `heroTimeline.ts` (`sink`, `backdrop`, `covered`, jump catch-up), `engine.ts`, `categories.css`, `categories-plate.css` (`--glass-*`), D16 | `npm run test:ui` (the catalog rises through the hero's water: pinned, alive, nothing of the catch through the plates, contrast on the water, CTA jump; fallbacks), sweep static check (no spacer, not sticky without motion), G16 |
+| the catalog title is light type on deep water, readable wherever it passes: heading 3:1, lede 4.5:1 | `categories.css` (light variant), `underwater.css` (`.hero-depth`), `heroTimeline.ts` (depth curve) | `npm run test:ui` (contrast by pixel sampling at three heading positions, five screens) |
+| one handover line for the sticky bar, the hero's inert state and the hero nav's exit | `lib/utils/handoverLine.ts`, `SiteNavigation.tsx`, `heroTimeline.ts` | `npm run test:ui` (keyboard, pinned hero), sweep G11 |
+| the approach to the list is short, with no lagging frame when scrolling back: `--sheet-lead` 0.75 / 0.65, a short scrub for the sink | `underwater.css` (`--sheet-lead`), `scrub.ts` (`sinkScrubSeconds`), `heroTimeline.ts` | sweep G16 (bite to sheet, first row, all tiles), `npm run test:ui` (categories arrive after the fish) |
+| the inspector's close button is small (36 px fine pointer, 44 px touch) | `categories-inspector.css` (`.cat-modal__close`) | sweep G4 (target sizes), G3 |
+| the nav is visible on the water and on the page: full-ink links, a light veil behind the hero nav, an ink hover plate, a lift under the shown sticky bar | `underwater.css` (`.hero-nav::before`, `.hero-nav__link`), `site-nav.css`, `tide-button.css` | `npm run test:ui` (links in full ink, hover plate ink with a white label) |
+| the inspector's flight lands without movement: the plate is calm until the pointer moves, the ghost is the whole picture cut to each window, the flying card cross-fades with the real plate | `categoryInspector.ts` (`place()`, `SHELL_FADE_MS`), `categories-inspector.css` (`data-calm`) | `npm run test:ui` (closing: the plate lands at rest, then eases into hover), frozen-flight diff (CLAUDE.md) |
+| nothing is drawn over the product photo on a plate (no line, no ring) | `CategoryCard.tsx`, `categories-plate.css` | `npm run test:ui` (a touched plate lights, nothing inside the photo window but the photo, the chip and the surface line) |
+| the foreground and mid fish are saturated blue (`brandBlue` + `seaDeep`), the far ones stay faint | `renderFish.ts` (`BACK_VIVID`), `fish.ts` (opacity ranges) | `npm run test:ui` (fish are Mechaavo blue) |
+| the product photos are shown in their own colour, no blend, no filter | `categories-plate.css`, `docs/make-category-images.mjs` | `npm run test:ui` (photos have no blend or filter, at least six of eight carry colour) |
+| the whole plate flies into the inspector and back (shell + photo ghost), never needed for state | `categoryInspector.ts`, `categories-inspector.css` | `npm run test:ui` (shell mid-flight between plate and panel, plate hidden, nothing left after, focus back) |
+| category plates: photo window, depth ruler read from the category's own depth text, "Works at" for screen readers | `CategoryCard.tsx`, `lib/config/depth.ts`, `categories-plate.css` | `npm run test:ui` (category plates: eight rulers, labels Surface, 0-8 ft, 20-350+ ft, All depths) |
+| a touched plate is cast (line drops, lure swings, ring of light, arrow fills, name plate) from one switch, `--lit`; hover only under `(hover: hover)`, reduced motion still, forced colours system colours | `categories-plate.css`, `categoryPointer.ts`, D14 | `npm run test:ui` (cast on focus, reduced motion: no line) |
+| the inspector: the photo flies from the plate into the dialog and back, never needs the flight for state, covers the sticky bar, focus returns to the plate | `CategoryInspector.tsx`, `categoryInspector.ts`, `categories-inspector.css`, `--z-modal` | `npm run test:ui` (flight, landing, no ghost left, covers the bar, Escape, focus, reduced motion), sweep G3 |
+| plates arrive as the water drains off the photo window and the depth ruler draws itself, once, interruptible, no canvas | `categoriesReveal.ts` | `npm run test:ui` (arrival, press mid-wave, keyboard, reduced motion, no script), sweep G16, G17 |
+| browser chrome matches the page (theme-color), derived from the token | `lib/config/themeColor.server.ts`, `app/layout.tsx` | built HTML (`<meta name="theme-color">`) |
+| below-the-fold groups surface with one shared entrance (once, interruptible, never held out of the tab order, every fallback shows them) | `surfaceReveal.ts`, `SurfaceReveal.tsx`, `surface.css` | `npm run test:ui` (held before view, at rest after, focus brings the group up, reduced motion, no script) |
+| the caustic tile never holds the main thread (8 ms slices, off-thread encode) | `caustics.ts` | Lighthouse mobile TBT |

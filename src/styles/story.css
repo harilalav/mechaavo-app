@@ -1,131 +1,14 @@
 /*
- * Story section media panel (components/showcase/StoryVideo.tsx).
- *
- * The footage is stored as plain grayscale (docs/media-credits.md), so every
- * color in this panel comes from brand tokens, laid up in three layers:
- *   1. the clip, multiplied onto --color-primary (white becomes the brand blue)
- *   2. a lift of white from the sunlit top (screen)
- *   3. a dark scrim at the bottom for depth (multiply)
- * Same token rule as everywhere: no raw color values.
+ * The story section's water: the water light behind each section, and the layer the categories use to
+ * paint over the pinned hero. (There is no video panel and no footage on the site any more: the water is
+ * CSS and the hero's canvas.)
  */
 
-.story-media {
-  --story-z-toggle: 1;
-
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  /* on an ultrawide screen 21 / 9 is taller than the screen: the footage is cropped instead (object-fit: cover) */
-  max-height: 90svh;
-  background-color: var(--color-primary);
-}
-@media (min-width: 768px) {
-  .story-media {
-    aspect-ratio: 21 / 9;
-  }
-}
-
-.story-media__poster,
-.story-media__video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  mix-blend-mode: multiply;
-  filter: brightness(1.25) contrast(1.05);
-}
-
-/* the poster stands in until the first frame of the clip is on screen */
-.story-media__poster {
-  transition: opacity 700ms var(--ease-out);
-}
-.story-media[data-started] .story-media__poster {
-  opacity: 0;
-}
-
-.story-media__lift,
-.story-media__deep {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.story-media__lift {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--color-white) 55%, transparent),
-    transparent 70%
-  );
-  mix-blend-mode: screen;
-}
-.story-media__deep {
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--color-dark) 38%, transparent),
-    transparent 55%
-  );
-  mix-blend-mode: multiply;
-}
-
-/* the footage settles as the panel scrolls into view (progressive enhancement) */
-@media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .story-media__poster,
-    .story-media__video {
-      animation: story-settle linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 55%;
-    }
-  }
-}
-@keyframes story-settle {
-  from {
-    transform: scale(1.12);
-  }
-  to {
-    transform: scale(1);
-  }
-}
-
-/* pause / play: a 44px target, square to match the page's shape rule */
-.story-media__toggle {
-  position: absolute;
-  z-index: var(--story-z-toggle);
-  right: 1rem;
-  bottom: 1rem;
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  cursor: pointer;
-  color: var(--color-white);
-  background-color: color-mix(in srgb, var(--color-dark) 55%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-white) 32%, transparent);
-  transition:
-    color var(--btn-color),
-    transform 300ms var(--ease-out);
-}
-/* hover: the cast plate (class tide-btn, tide-button.css), the icon turning ink on it */
-.story-media__toggle:active {
-  transform: scale(0.96);
-}
-/* sits on the footage, so the focus ring is white rather than ink */
-.story-media__toggle:focus-visible {
-  outline: 2px solid var(--color-white);
-  outline-offset: 3px;
-}
-/* without script there is nothing to control */
-.story-media:not([data-ready]) .story-media__toggle {
-  display: none;
-}
-
 /*
- * The first story section is a sheet laid over the hero's last screen (the
- * margin that pulls it up lives with the hero's track length in underwater.css).
- * It must paint above the sticky hero, and it opens with the water the hero ends
- * in, so the scene hands over to the page instead of being cut off by a white edge.
+ * The categories section scrolls up over the pinned hero (it is inside the hero's track: MechaavoHero,
+ * underwater.css), so it must paint above it: positioned, on the page's sheet layer, its own stacking context.
+ * (It used to be a sheet pulled up over the hero's last screen with a swell for an edge; the client found the
+ * edge messy, 2026-10-16, and the catalog now rises through the hero's water.)
  */
 .story-sheet {
   position: relative;
@@ -134,25 +17,13 @@
 }
 
 /*
- * The water's color where one section meets the one before it: the brand blue,
+ * The water's color where one section meets the one before it: pale azure,
  * thinned into the page. On :root, not on .story-sheet: every `top` water light
  * (the categories sheet and the story section) opens with it, and a var that is
  * not defined where it is used would void the whole wash.
  */
 :root {
-  --story-edge: color-mix(in srgb, var(--color-primary) 17%, var(--page));
-}
-
-/* the top edge: a slow swell, in the same color the water below it begins with */
-.story-edge {
-  position: absolute;
-  inset-inline: 0;
-  bottom: calc(100% - 1px);
-  display: block;
-  width: 100%;
-  height: clamp(2.75rem, 7vw, 6.5rem);
-  pointer-events: none;
-  fill: var(--story-edge);
+  --story-edge: color-mix(in srgb, var(--water) 24%, var(--page));
 }
 
 /*
@@ -180,10 +51,10 @@
 }
 .water-light--top .water-light__wash {
   background:
-    /* luminous cyan where the line went out of the frame, upper right (clear of the top edge, so the swell above meets a flat color) */
+    /* clear azure where the line went out of the frame, upper right (clear of the top edge, so the swell above meets a flat color) */
     radial-gradient(
       ellipse 54% 24% at 84% 22%,
-      color-mix(in srgb, var(--color-accent-secondary) 24%, transparent),
+      color-mix(in srgb, var(--water) 28%, transparent),
       transparent 100%
     ),
     /* sun glare, upper left */
@@ -196,7 +67,7 @@
     linear-gradient(
       to bottom,
       var(--story-edge) 0%,
-      color-mix(in srgb, var(--color-primary) 9%, var(--page)) 34%,
+      color-mix(in srgb, var(--water) 11%, var(--page)) 34%,
       var(--page) 82%
     );
 }
@@ -207,7 +78,7 @@
   position: absolute;
   top: clamp(3rem, 9vw, 8rem);
   right: -10%;
-  width: min(68vw, 1040px);
+  width: min(68vw, 65rem);
   aspect-ratio: 910 / 314;
   background-color: color-mix(in srgb, var(--color-primary) 13%, transparent);
   -webkit-mask: url("/images/mechaavo-logo-mark.png") center / contain no-repeat;
@@ -248,7 +119,7 @@
   background:
     radial-gradient(
       ellipse 60% 70% at 100% 0%,
-      color-mix(in srgb, var(--color-primary) 11%, transparent),
+      color-mix(in srgb, var(--water) 15%, transparent),
       transparent 70%
     ),
     linear-gradient(
@@ -274,13 +145,13 @@
   background:
     radial-gradient(
       ellipse 70% 50% at 20% 100%,
-      color-mix(in srgb, var(--color-accent-secondary) 20%, transparent),
+      color-mix(in srgb, var(--water) 24%, transparent),
       transparent 72%
     ),
     linear-gradient(
       to top,
-      color-mix(in srgb, var(--color-primary) 22%, var(--page)) 0%,
-      color-mix(in srgb, var(--color-primary) 8%, var(--page)) 48%,
+      color-mix(in srgb, color-mix(in srgb, var(--water) 75%, var(--water-deep)) 22%, var(--page)) 0%,
+      color-mix(in srgb, var(--water) 9%, var(--page)) 48%,
       transparent 100%
     );
 }

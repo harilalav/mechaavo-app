@@ -15,15 +15,25 @@ const ITERATIONS = 6;
 const INTENSITY = 0.005;
 const TIME = 23;
 
-/** Rows computed before handing the thread back, so building the tile never blocks input or paint. */
-const ROWS_PER_SLICE = 24;
+/**
+ * How long the tile may hold the thread before it gives it back, in ms. A time budget, not a row count: a
+ * slice of 24 rows ran 35 to 60 ms, which a phone four times slower than this machine feels as a 140 to 250 ms
+ * block (Lighthouse counts that as blocking time and the page cannot respond or paint meanwhile). 8 ms here is
+ * about 32 ms there, under the 50 ms line.
+ */
+const SLICE_MS = 8;
 
-const yieldToBrowser = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+/** `scheduler.yield()` where there is one (no 4 ms timer clamp), a timeout otherwise. */
+const yieldToBrowser = (): Promise<void> => {
+  const scheduler = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  return scheduler?.yield ? scheduler.yield() : new Promise<void>((resolve) => setTimeout(resolve, 0));
+};
 
 /**
- * A data URL for a `size` x `size` tile (WebP where the browser can encode it,
- * PNG otherwise), or null when a canvas is unavailable or `isCancelled()` turns
- * true. Computed in small slices with the thread released between them.
+ * An object URL for a `size` x `size` tile (WebP where the browser can encode it, PNG otherwise), or null
+ * when a canvas is unavailable or `isCancelled()` turns true. Computed in short slices with the thread released
+ * between them, and encoded off the main thread (`toBlob`, not a synchronous `toDataURL`). The caller owns the
+ * URL and revokes it (URL.revokeObjectURL) when it is done.
  */
 export async function createCausticTile(
   size: number,
@@ -38,10 +48,12 @@ export async function createCausticTile(
 
   const image = ctx.createImageData(size, size);
   const data = image.data;
+  let sliceStart = performance.now();
   for (let y = 0; y < size; y++) {
-    if (y > 0 && y % ROWS_PER_SLICE === 0) {
+    if (y > 0 && performance.now() - sliceStart > SLICE_MS) {
       await yieldToBrowser();
       if (isCancelled()) return null;
+      sliceStart = performance.now();
     }
     for (let x = 0; x < size; x++) {
       // the offset keeps the (non-periodic) division terms nearly constant across the tile, which is what makes it seamless
@@ -72,6 +84,9 @@ export async function createCausticTile(
     }
   }
   ctx.putImageData(image, 0, 0);
-  const webp = canvas.toDataURL("image/webp", 0.85);
-  return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/png");
+  await yieldToBrowser();
+  if (isCancelled()) return null;
+  // a browser without a WebP encoder hands back a PNG for this type, so there is no second attempt to make
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.85));
+  return blob ? URL.createObjectURL(blob) : null;
 }

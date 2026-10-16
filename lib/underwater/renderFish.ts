@@ -1,4 +1,4 @@
-import type { BrandPalette, BrandToken } from "../theme/brand";
+import type { BrandPalette, BrandShade, BrandToken } from "../theme/brand";
 import { MIN_TURN } from "./pose";
 import { TAU } from "./rng";
 import type { Fish, FishTier, SpeciesKey } from "./types";
@@ -18,9 +18,9 @@ import type { Fish, FishTier, SpeciesKey } from "./types";
  *
  * Orientation comes from the simulation: `facing` and `turn` (foreshortening
  * while the fish swings toward or away from the camera) and `pitch`. Fish are
- * countershaded (dark back, pale belly) in brand tokens, and solid: depth is
- * expressed through tone and opacity, never by letting one fish show through
- * another.
+ * Mechaavo blue, countershaded (dark back, pale belly), and solid: depth is
+ * expressed by mixing a tier's shades into the water (atmospheric perspective)
+ * and by opacity, never by letting one fish show through another.
  *
  * Everything is drawn in "fish-length" units (head at the origin, body toward
  * -x), so one cached gradient per tier serves every fish of that tier.
@@ -135,9 +135,18 @@ function profile(u: number, peak: number, snout: number, stock: number): number 
 
 interface TierStyle {
   /** Back to belly (top to bottom) in fish-length units; opacity comes from the fish. */
-  stops: readonly (readonly [number, BrandToken])[];
+  stops: readonly (readonly [number, BrandShade])[];
+  /**
+   * Atmospheric perspective: how far every shade is mixed into the water between the
+   * fish and the camera (0 = none), and which water. Distance reads as the sea's own
+   * colour, not only as transparency.
+   */
+  fog: number;
+  fogInto: BrandToken;
   /** Pale line along the belly: opacity. */
   belly: number;
+  /** Sunlight on the outline (the fish are blue and so is the water): a thin pale edge, opacity (0 = none). */
+  rim: number;
   /** Faint outer edge that softens a distant fish (stroke, fish-length units). */
   edge: number;
   detail: boolean;
@@ -146,40 +155,63 @@ interface TierStyle {
   gloss: number;
 }
 
+/*
+ * Mechaavo blue fish (D12: the logo's blue, `brandBlue`), countershaded like a real
+ * pelagic fish: a dark blue back, the brand blue on the flank, a pale belly.
+ */
+const BACK: BrandShade = [["brandBlue", 0.42], ["dark", 0.58]];
+// the foreground and mid-water fish: the logo's blue deepened with the navy of the sea, not with the near-black
+// of the ink, so they stay saturated instead of going to a grey-navy silhouette (client round 3: "the fish in the
+// foreground can be more colour saturated so they can be seen immediately")
+const BACK_VIVID: BrandShade = [["brandBlue", 0.66], ["seaDeep", 0.34]];
+const BACK_VIVID_SOFT: BrandShade = [["brandBlue", 0.86], ["seaDeep", 0.14]];
+const FLANK: BrandShade = [["brandBlue", 1]];
+const FLANK_PALE: BrandShade = [["brandBlue", 0.7], ["white", 0.3]];
+const BELLY: BrandShade = [["brandBlue", 0.28], ["white", 0.72]];
+
 const STYLES: Record<FishTier, TierStyle> = {
-  // distant: flat, pale, quiet: a shape in the haze
+  // distant: flat, quiet, half dissolved into the azure: a shape in the haze
   far: {
     stops: [
-      [0, "secondary"],
-      [1, "secondary"],
+      [0, FLANK],
+      [1, FLANK],
     ],
+    fog: 0.55,
+    fogInto: "seaMid",
     belly: 0,
+    rim: 0,
     edge: 0.03,
     detail: false,
     fins: false,
     gloss: 0,
   },
-  // mid-water: slate rather than near-black, so the hero fish (the darkest thing in the water) leads
+  // mid-water: softer than the hero fish, so the hero (the deepest blue in the water) leads
   mid: {
     stops: [
-      [0, "secondary"],
-      [0.55, "secondary"],
-      [1, "light"],
+      [0, BACK_VIVID_SOFT],
+      [0.55, FLANK],
+      [1, FLANK_PALE],
     ],
+    fog: 0.14,
+    fogInto: "seaMid",
     belly: 0.55,
+    rim: 0.3,
     edge: 0,
     detail: true,
     fins: false,
     gloss: 0,
   },
-  // foreground: large, dark, out of focus (drawn into a small buffer and upscaled)
+  // foreground: large, saturated, out of focus (drawn into a small buffer and upscaled)
   near: {
     stops: [
-      [0, "dark"],
-      [0.6, "dark"],
-      [1, "secondary"],
+      [0, BACK_VIVID],
+      [0.6, BACK_VIVID],
+      [1, FLANK],
     ],
+    fog: 0.06,
+    fogInto: "seaMid",
     belly: 0,
+    rim: 0,
     edge: 0,
     detail: false,
     fins: false,
@@ -187,19 +219,28 @@ const STYLES: Record<FishTier, TierStyle> = {
   },
   primary: {
     stops: [
-      [0, "dark"],
-      [0.3, "dark"],
-      [0.54, "secondary"],
-      [0.76, "secondary"],
-      [1, "light"],
+      [0, BACK],
+      [0.3, BACK],
+      [0.54, FLANK],
+      [0.76, FLANK_PALE],
+      [1, BELLY],
     ],
+    fog: 0,
+    fogInto: "seaMid",
     belly: 0.7,
+    rim: 0.6,
     edge: 0,
     detail: true,
     fins: true,
-    gloss: 0.3,
+    gloss: 0.45,
   },
 };
+
+/** A shade with the tier's water mixed in. */
+function fogged(shade: BrandShade, fog: number, into: BrandToken): BrandShade {
+  if (fog <= 0) return shade;
+  return [...shade.map(([token, w]) => [token, w * (1 - fog)] as const), [into, fog] as const];
+}
 
 const MAX_SEGMENTS = 24;
 const WAVES = 0.85;
@@ -271,17 +312,18 @@ export function createProceduralFishRenderer(
     cached(ctx, `body:${tier}:${species}`, () => {
       const reach = SPECIES[species].depth * 0.55;
       const g = ctx.createLinearGradient(0, -reach, 0, reach);
-      for (const [offset, token] of STYLES[tier].stops) g.addColorStop(offset, palette.solid(token));
+      const style = STYLES[tier];
+      for (const [offset, shade] of style.stops) g.addColorStop(offset, palette.blend(fogged(shade, style.fog, style.fogInto)));
       return g;
     });
 
-  /** Baitfish: back dark, flank silver. */
+  /** Baitfish: a blue back over a silver flank, a little into the water like the mid tier. */
   const baitFill = (ctx: CanvasRenderingContext2D) =>
     cached(ctx, "bait", () => {
       const g = ctx.createLinearGradient(0, -0.1, 0, 0.1);
-      g.addColorStop(0, palette.solid("dark"));
-      g.addColorStop(0.45, palette.solid("secondary"));
-      g.addColorStop(1, palette.solid("light"));
+      g.addColorStop(0, palette.blend(fogged(BACK, 0.2, "seaMid")));
+      g.addColorStop(0.45, palette.blend(fogged([["brandBlue", 0.45], ["white", 0.55]], 0.2, "seaMid")));
+      g.addColorStop(1, palette.solid("white"));
       return g;
     });
 
@@ -468,8 +510,17 @@ export function createProceduralFishRenderer(
 
       // a faint outer edge softens a distant fish into the haze
       if (style.edge > 0) {
-        ctx.strokeStyle = palette.alpha("secondary", 0.22);
+        ctx.strokeStyle = palette.alpha("seaDeep", 0.24);
         ctx.lineWidth = style.edge;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      }
+
+      // sunlight on the outline: the fish and the water are both blue, so a thin pale edge (the
+      // surface light catching the scales) is what lifts the silhouette off the azure
+      if (style.rim > 0) {
+        ctx.strokeStyle = palette.alpha("white", style.rim);
+        ctx.lineWidth = 0.0075;
         ctx.lineJoin = "round";
         ctx.stroke();
       }
@@ -493,7 +544,7 @@ export function createProceduralFishRenderer(
         ctx.stroke();
       }
 
-      // the hero fish carries a faint brand-blue gloss down the flank
+      // the hero fish carries a cyan gloss along its lateral line, light on the blue flank
       if (style.gloss > 0) {
         const g0 = Math.round(0.2 * n);
         const g1 = Math.round(0.86 * n);
@@ -502,7 +553,7 @@ export function createProceduralFishRenderer(
         for (let i = g0 + 1; i < g1; i++) {
           ctx.quadraticCurveTo(sx[i], sy[i], (sx[i] + sx[i + 1]) / 2, (sy[i] + sy[i + 1]) / 2);
         }
-        ctx.strokeStyle = palette.alpha("primary", style.gloss);
+        ctx.strokeStyle = palette.alpha("accentSecondary", style.gloss);
         ctx.lineWidth = 0.026;
         ctx.lineCap = "round";
         ctx.stroke();

@@ -1,6 +1,6 @@
 /*
  * The sticky bar (components/ui/SiteNavigation.tsx): the hero nav's second state, shown
- * from #story on. The page white with a hairline under it, square cornered like the page,
+ * from #categories on (once the curtain over the hero reaches it). The page white with a hairline under it, square cornered like the page,
  * 64px tall (the hero's cap is 80). Its links wear the same cast plate (tide-btn) and use
  * the same fold as the hero nav: a Menu button under 768px, inline links from there.
  */
@@ -16,6 +16,8 @@
 .site-nav[data-show="true"] {
   transform: none;
   opacity: 1;
+  /* a lift under the bar (only while it is shown: hidden, its shadow would peek in at the top of the page): the bar is the page white, and over the pale azure the story opens on it nearly blended with it */
+  box-shadow: 0 14px 26px -20px color-mix(in srgb, var(--color-secondary) 32%, transparent);
 }
 
 /* leaving is about 65% of arriving; reduced motion: no slide, the bar simply is or is not there */
@@ -108,10 +110,10 @@
   min-height: 48px;
   padding: 0 1rem;
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--ink);
   touch-action: manipulation;
 }
 

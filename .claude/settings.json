@@ -1,10 +1,4 @@
 {
-  "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true,
-    "vercel@claude-plugins-official": true,
-    "frontend-design@claude-code-plugins": true,
-    "ui-ux-pro-max@ui-ux-pro-max-skill": true
-  },
   "permissions": {
     "allow": [
       "Bash(npm run design:*)",
@@ -27,5 +21,12 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true,
+    "frontend-design@claude-code-plugins": true,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true,
+    "humanizer@humanizer": true
   }
 }
