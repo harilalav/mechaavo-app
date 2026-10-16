@@ -215,7 +215,7 @@ test.describe("headings, light and the dive", () => {
       const rgb = (c: string) => (c.match(/\d+(\.\d+)?/g) ?? [0, 0, 0]).slice(0, 3).map(Number) as RGB;
       const typeOnPlate = contrast(rgb(found.text), rgb(found.plate));
       // the ground around the label: the page with the plate taken away
-      await hide(page, [".tide__plate", ".tide__glint"]);
+      await hide(page, [".tide__plate", ".tide__glint", ".tide__mark::before"]);
       await page.waitForTimeout(80);
       const [ground] = await samplePixels(page, await cssShot(page), [found.box], 2);
       const onGround = median(ground.map((px) => contrast(rgb(found.plate), px as RGB)));
@@ -357,6 +357,101 @@ test.describe("no video", () => {
     expect(found.videos, "no <video> element").toBe(0);
     expect(found.toggles, "no pause or play button for one").toBe(0);
     expect(requests.filter((u) => /\.(mp4|webm|mov)(\?|$)|\/videos\//i.test(u)), "no video file requested").toEqual([]);
+  });
+});
+
+test.describe("the payoff word's colour", () => {
+  test("ink before its plate arrives, white on the plate after: never white on the page (client review 2026-10-16)", async ({ page }, info) => {
+    const errors = errorsOf(page);
+    await openHome(page);
+    // a heading on the white page: scroll it in, then hold its animations at chosen moments (the words risen, the plate not yet there, then done)
+    const box = await page.evaluate(() => {
+      const heading = [...document.querySelectorAll<HTMLElement>("h2.tide")].find((h) => h.textContent?.includes("Great"));
+      heading?.scrollIntoView({ behavior: "instant", block: "center" });
+      heading?.setAttribute("data-probe", "");
+      const r = heading?.querySelector<HTMLElement>(".tide__mark")?.getBoundingClientRect();
+      return r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+    });
+    expect(box, "the purpose heading and its plate word are there").not.toBeNull();
+    await page.waitForTimeout(60);
+    const hold = (at: number) =>
+      page.evaluate((t) => {
+        const heading = document.querySelector("[data-probe]")!;
+        for (const a of heading.getAnimations({ subtree: true })) {
+          a.pause();
+          // the words' rise and the water in the letters are finished; the plate, its colour and its light are held at `t`
+          a.currentTime = /tide-(rise|dip)$/.test((a as CSSAnimation).animationName ?? "") ? 4000 : t;
+        }
+      }, at);
+    const rgbBox = { x: box!.x + box!.w * 0.12, y: box!.y + box!.h * 0.2, w: box!.w * 0.76, h: box!.h * 0.6 };
+    const read = async () => {
+      await page.waitForTimeout(80);
+      const [pixels] = await samplePixels(page, await cssShot(page), [rgbBox], 2);
+      const ground = median(pixels.map((px) => luminance(px as RGB)));
+      const lums = pixels.map((px) => luminance(px as RGB));
+      return {
+        ground,
+        dark: lums.filter((l) => l < 0.04).length / lums.length,
+        light: lums.filter((l) => l > 0.8).length / lums.length,
+      };
+    };
+
+    // before the plate: the word is on the page itself, so it must be dark (white there is invisible)
+    await hold(10);
+    const before = await read();
+    info.annotations.push({ type: "payoff word before", description: `dark ${(before.dark * 100).toFixed(0)}%, light ${(before.light * 100).toFixed(0)}%` });
+    expect(before.dark, "the word shows as ink on the page before the plate").toBeGreaterThan(0.08);
+
+    // the plate half across: ink where it has not reached, white with the plate where it has
+    await hold(930 + 820 * 0.55);
+    const mid = await read();
+    info.annotations.push({ type: "payoff word mid", description: `dark ${(mid.dark * 100).toFixed(0)}%, light ${(mid.light * 100).toFixed(0)}%` });
+    expect(mid.dark, "ink on both the plate and the page while it crosses").toBeGreaterThan(0.1);
+    expect(mid.light, "white letters appear with the plate").toBeGreaterThan(0.05);
+
+    // done: white letters on the ink plate
+    await hold(4000);
+    const after = await read();
+    info.annotations.push({ type: "payoff word after", description: `dark ${(after.dark * 100).toFixed(0)}%, light ${(after.light * 100).toFixed(0)}%` });
+    expect(after.dark, "the plate is ink").toBeGreaterThan(0.2);
+    expect(after.light, "the letters are white on it").toBeGreaterThan(0.2);
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe("the catalog hooks to the top", () => {
+  test("a scroll that rests with the catalog half up settles it under the sticky bar; inside it nothing snaps", async ({ page }) => {
+    const errors = errorsOf(page);
+    await openHome(page);
+    await page.evaluate(() => window.localStorage.removeItem("mechaavo-snap"));
+    const read = () =>
+      page.evaluate(() => ({
+        top: Math.round(document.getElementById("categories")?.getBoundingClientRect().top ?? 0),
+        bar: document.querySelector<HTMLElement>(".site-nav")?.offsetHeight ?? 0,
+        vh: window.innerHeight,
+      }));
+    // the steady gesture, down, until the catalog's top is 45% down the screen (a pause shorter than the snap's delay between steps)
+    for (let i = 0; i < 80; i++) {
+      const s = await read();
+      if (s.top < s.vh * 0.45) break;
+      await step(page, 130);
+    }
+    const parked = await read();
+    expect(parked.top, "the gesture stopped with the catalog partway up").toBeGreaterThan(parked.bar + 20);
+    await page.waitForTimeout(2000);
+    const hooked = await read();
+    expect(Math.abs(hooked.top - hooked.bar), "after the rest the catalog's top is under the bar").toBeLessThanOrEqual(2);
+    // scroll on inside the catalog: it stays where the reader put it
+    await page.evaluate(() => window.scrollBy(0, 240));
+    await page.waitForTimeout(1500);
+    const inside = await read();
+    expect(Math.abs(inside.top - (hooked.top - 240)), "inside the catalog nothing snaps").toBeLessThanOrEqual(2);
+    // back up to the catalog's top half way between the bar and the bottom edge: going up takes the nearer end
+    await page.evaluate(([y]) => window.scrollBy(0, y), [-(240 + Math.round(hooked.vh * 0.6))]);
+    await page.waitForTimeout(2000);
+    const up = await read();
+    expect(Math.abs(up.top - up.vh), "going up from the lower half returns to the hero's finished scene").toBeLessThanOrEqual(2);
+    expect(errors).toEqual([]);
   });
 });
 

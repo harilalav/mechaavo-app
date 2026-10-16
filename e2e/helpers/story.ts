@@ -1,7 +1,14 @@
 import type { Page } from "@playwright/test";
 
-/** Load the page and let the hero's engine start (it sets data-ready on the hero root). */
+/**
+ * Load the page and let the hero's engine start (it sets data-ready on the hero root).
+ * The catalog's snap (heroTimeline.ts) is switched off here: these specs park the page between positions on purpose
+ * and measure it there; the one spec of the snap itself turns it back on.
+ */
 export async function openHome(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("mechaavo-snap", "off");
+  });
   await page.goto("/", { waitUntil: "load" });
   await page.waitForSelector(".hero-root[data-ready]", { timeout: 20_000 }).catch(() => {});
   await page.waitForTimeout(1500);

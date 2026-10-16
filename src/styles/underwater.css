@@ -637,7 +637,12 @@
   color: var(--ink-soft);
 }
 
-/* the cast plate on hover is tide-button.css (class tide-btn): the lift and the arrow's nudge below stay */
+/*
+ * The hero CTA wears the heading's cast plate (ink, white text, accent foot edge)
+ * at rest, matching the payoff word "cast" in the headline above it.
+ * On hover, the band of light crosses it immediately (the same glint animation as "cast"),
+ * alongside the button's lift and arrow nudge.
+ */
 .hero-cta {
   position: relative;
   display: inline-flex;
@@ -651,30 +656,52 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: var(--on-accent);
-  background-color: var(--accent);
+  color: var(--plate-ink);
+  background-color: var(--plate-bg);
+  box-shadow:
+    inset 0 -0.14em 0 var(--plate-edge),
+    0 0.1em 0.3em -0.1em color-mix(in srgb, var(--color-dark) 42%, transparent);
+  --on-plate: var(--plate-ink);
   transition:
+    color var(--btn-color),
     transform 300ms var(--ease-out),
     box-shadow 300ms var(--ease-out);
 }
-.hero-cta:focus-visible {
-  transform: translateY(-2px);
-  /* tinted to the water, never a black drop shadow */
-  box-shadow: 0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+/* the button already wears the cast plate at rest, so no wipe is needed */
+.hero-cta::before {
+  display: none;
 }
-/* the same lift and nudge for a pointer; on touch :hover would stay stuck after a tap */
+.hero-cta:focus-visible {
+  color: var(--plate-ink);
+  transform: translateY(-2px);
+  /* tinted to the water, keeping the accent edge */
+  box-shadow:
+    inset 0 -0.14em 0 var(--plate-edge),
+    0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+}
+.hero-cta:focus-visible::after {
+  animation: tide-glint-again 1100ms ease-in-out both;
+}
+/* the same lift, nudge and glint for a pointer; on touch :hover would stay stuck after a tap */
 @media (hover: hover) {
   .hero-cta:hover {
+    color: var(--plate-ink);
     transform: translateY(-2px);
-    box-shadow: 0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+    box-shadow:
+      inset 0 -0.14em 0 var(--plate-edge),
+      0 14px 26px -12px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  }
+  .hero-cta:hover::after {
+    animation: tide-glint-again 1100ms ease-in-out both;
   }
   .hero-cta:hover svg {
     transform: translateX(3px);
   }
 }
 .hero-cta:active {
+  color: var(--plate-ink);
   transform: translateY(0) scale(0.98);
-  box-shadow: none;
+  box-shadow: inset 0 -0.14em 0 var(--plate-edge);
 }
 .hero-cta svg {
   transition: transform 300ms var(--ease-out);
@@ -806,11 +833,18 @@
   .hero-statement .tide__plate {
     transform: scaleX(0) skewX(var(--tide-skew));
   }
+  /* the payoff word is ink until the plate comes, and turns white as the plate's edge crosses it (tide.css) */
+  .hero-statement .tide__mark {
+    --tide-wipe: 0;
+  }
   .hero-statement .tide__drop {
     opacity: 0;
   }
   .hero-root[data-caught] .hero-statement .tide__plate {
     animation: tide-plate 820ms cubic-bezier(0.7, 0, 0.2, 1) 780ms both;
+  }
+  .hero-root[data-caught] .hero-statement .tide__mark {
+    animation: tide-wipe 820ms cubic-bezier(0.7, 0, 0.2, 1) 780ms both;
   }
   .hero-root[data-caught] .hero-statement .tide__glint {
     animation: tide-glint 1300ms ease-in-out 1550ms both;

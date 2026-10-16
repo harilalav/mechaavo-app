@@ -982,6 +982,8 @@ async function runScreen(browser, screen, o, results) {
   {
     const ctx = await browser.newContext(ctxOptions(screen));
     await ctx.addInitScript(CLS_SCRIPT);
+    // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+    await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
     const page = await ctx.newPage();
     const ev = collect(page);
     await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
@@ -1036,6 +1038,8 @@ async function runScreen(browser, screen, o, results) {
   /* ---- G16: the scroll budget, on a page the fish has not yet bitten on */
   if (screen.deep && o.states.includes(STATE_BUDGET)) {
     const ctx = await browser.newContext(ctxOptions(screen));
+    // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+    await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
     const page = await ctx.newPage();
     await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
     await readyHero(page, true);
@@ -1056,6 +1060,8 @@ async function runScreen(browser, screen, o, results) {
   /* ---- no script */
   {
     const ctx = await browser.newContext(ctxOptions(screen, { javaScriptEnabled: false }));
+    // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+    await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
     const page = await ctx.newPage();
     await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
     await readyHero(page, false);
@@ -1079,7 +1085,9 @@ async function runScreen(browser, screen, o, results) {
       ["forced", { forcedColors: "active" }],
     ]) {
       const ctx = await browser.newContext(ctxOptions(screen, extra));
-      const page = await ctx.newPage();
+      // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+      await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
+    const page = await ctx.newPage();
       await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
       await readyHero(page, true);
       const cfg = { ...T };
@@ -1097,7 +1105,9 @@ async function runScreen(browser, screen, o, results) {
 
     {
       const ctx = await browser.newContext(ctxOptions(screen));
-      const page = await ctx.newPage();
+      // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+      await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
+    const page = await ctx.newPage();
       await page.goto(o.url, { waitUntil: "load", timeout: 60000 });
       await readyHero(page, true);
       await page.addStyleTag({ content: "html{font-size:200% !important}" });
@@ -1111,7 +1121,9 @@ async function runScreen(browser, screen, o, results) {
     if (!screen.touch) {
       const browser2 = await chromium.launch({ executablePath: o.chrome, headless: true, ignoreDefaultArgs: ["--hide-scrollbars"], args: ["--disable-dev-shm-usage"] });
       const ctx = await browser2.newContext(ctxOptions(screen));
-      const page = await ctx.newPage();
+      // the catalog's snap (heroTimeline.ts) off: the sweep parks the page between positions to measure it
+      await ctx.addInitScript(() => { window.localStorage.setItem("mechaavo-snap", "off"); });
+    const page = await ctx.newPage();
       await page.addInitScript(() => {
         const s = document.createElement("style");
         s.textContent = "html{overflow-y:scroll}html::-webkit-scrollbar{width:15px;height:15px}";

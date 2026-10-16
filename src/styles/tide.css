@@ -27,6 +27,17 @@
   initial-value: 1;
 }
 
+/*
+ * How far the plate's leading edge has crossed its word: 0 before the plate arrives, 1 once it has covered the word.
+ * The word's colour follows it (below), so a payoff word is ink on the page until the ink plate reaches each letter
+ * and white from there on. Animated with the plate's own duration, delay and curve, so the two never part.
+ */
+@property --tide-wipe {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 /* how far the plate leans; on :root because the button plates (tide-button.css) and the tile names lean the same way outside a heading */
 :root {
   --tide-skew: -9deg;
@@ -42,6 +53,8 @@
   --plate-bg: var(--ink);
   --plate-ink: var(--page);
   --plate-edge: var(--accent);
+  /* the payoff word's colour before the plate reaches it: white type cannot wait on a white page (client review 2026-10-16) */
+  --mark-pre: var(--ink);
 }
 
 /* an explicit line, like the hero's */
@@ -112,6 +125,49 @@
   background: none;
   -webkit-text-fill-color: currentColor;
 }
+/*
+ * The payoff word is ink until the plate comes (white on the white page, or on the pale water, would simply not be
+ * there), then turns white exactly as the plate's edge passes each letter: a hard stop at the plate's edge, leaning
+ * as the plate does (the plate is sheared by the skew before it is scaled, so its edge leans by the skew times how
+ * far it has opened: the angle is 90deg plus that). The stop is the share of the word the plate has covered, plus the
+ * difference between the word and the plate behind it (the plate is the word and a 0.16em margin each side, so at
+ * the start the edge is 0.16em short of the first letter, and at the end 0.16em past the last), and a little for the
+ * gradient line's own slope: measured against the plate's frames it is within a pixel or two. `.tide__i` is a heading's
+ * word, `.tide__t` the bare text of a hand-built mark (the hero's): each carries the fill itself, because a fill on
+ * the mark would paint under the plate (the plate sits behind the mark's text, above the mark's own background).
+ * Finished (--tide-wipe 1, the default: no script, reduced motion) it is the white of before.
+ */
+@media (forced-colors: none) {
+  .tide .tide__mark .tide__i,
+  .tide .tide__mark .tide__t {
+    background: linear-gradient(
+      calc(90deg - var(--tide-wipe) * var(--tide-skew)),
+      var(--plate-ink) calc(var(--tide-wipe) * 100% + (2 * var(--tide-wipe) - 1) * 0.07em),
+      var(--mark-pre) calc(var(--tide-wipe) * 100% + (2 * var(--tide-wipe) - 1) * 0.07em)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+/*
+ * The label before it is filled: the plate's outline, in the plate's own ink with its accent foot, standing where the
+ * plate will (client review 2026-10-16: with the word dark until its plate arrives it read as the rest of the heading,
+ * so it needs a cue of its own). The plate fills it from the left and the letters turn white as it does; where the
+ * plate has covered it, the outline is the plate's own colour and is gone. Same box and lean as the plate, so the fill
+ * lands exactly inside it. Headings only (`.tide`): the category names' plates are touched, not played in.
+ */
+.tide .tide__mark::before {
+  content: "";
+  position: absolute;
+  inset: 0.07em 0 0.01em;
+  z-index: -1;
+  border: 0.035em solid var(--plate-bg);
+  border-bottom: 0.06em solid var(--plate-edge);
+  transform: skewX(var(--tide-skew));
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
 .tide__plate {
   position: absolute;
   inset: 0.07em 0 0.01em;
@@ -177,6 +233,19 @@
   }
   to {
     --tide-dip: 1;
+  }
+}
+@keyframes tide-wipe {
+  from {
+    --tide-wipe: 0;
+  }
+  to {
+    --tide-wipe: 1;
+  }
+}
+@keyframes tide-wipe-failsafe {
+  to {
+    --tide-wipe: 1;
   }
 }
 @keyframes tide-plate {
@@ -262,6 +331,9 @@
   .tide:not([data-inview]) .tide__plate {
     transform: scaleX(0) skewX(var(--tide-skew));
   }
+  .tide:not([data-inview]) .tide__mark {
+    --tide-wipe: 0;
+  }
   .tide:not([data-inview]) .tide__drop {
     opacity: 0;
   }
@@ -274,6 +346,11 @@
   }
   .tide[data-inview] .tide__plate {
     animation: tide-plate 820ms cubic-bezier(0.7, 0, 0.2, 1) both;
+    animation-delay: var(--pd, 380ms);
+  }
+  /* the word's colour crosses with the plate: same length, delay and curve */
+  .tide[data-inview] .tide__mark {
+    animation: tide-wipe 820ms cubic-bezier(0.7, 0, 0.2, 1) both;
     animation-delay: var(--pd, 380ms);
   }
   .tide[data-inview] .tide__glint {
@@ -297,6 +374,9 @@
   html:not([data-tide-ready]) .tide:not([data-inview]) .tide__plate,
   html:not([data-tide-ready]) .tide:not([data-inview]) .tide__drop {
     animation: tide-failsafe 1ms 3s both;
+  }
+  html:not([data-tide-ready]) .tide:not([data-inview]) .tide__mark {
+    animation: tide-wipe-failsafe 1ms 3s both;
   }
 }
 
@@ -325,7 +405,8 @@
   }
   .tide__plate,
   .tide__glint,
-  .tide__ring {
+  .tide__ring,
+  .tide .tide__mark::before {
     display: none;
   }
   .tide__mark {
