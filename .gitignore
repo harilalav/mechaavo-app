@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright suite (npm run test:ui)
+/e2e/.results/
+/e2e/.report/
