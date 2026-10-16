@@ -3,9 +3,9 @@
  * (components/ui/SiteFooter.tsx).
  *
  * A contact link is a whole tile: an icon and an arrow on top, what it is and the detail below. Square,
- * like the page (the rounded family is the categories card's). It wears the cast plate on hover, focus
- * and press like every button (tide-button.css: the class `tide-btn` is on the markup), so the
- * transition list keeps `color var(--btn-color)`. Tokens only.
+ * like the page (the rounded family is the categories card's). It wears the heading's ink cast plate on hover,
+ * focus and press (white type on ink with the cyan foot edge, matching "TOUCH" in the heading;
+ * tide-button.css provides the wipe, glint and timings). Tokens only.
  */
 
 /*
@@ -13,6 +13,7 @@
  * scroll; from sm each is a tile with the icon and arrow on top and the detail below.
  */
 .contact-link {
+  --on-plate: var(--plate-ink);
   position: relative;
   display: flex;
   align-items: center;
@@ -27,7 +28,12 @@
   transition:
     color var(--btn-color),
     border-color 300ms var(--ease-out),
+    box-shadow 300ms var(--ease-out),
     transform 300ms var(--ease-out);
+}
+.contact-link::before {
+  background: var(--plate-bg);
+  box-shadow: inset 0 -0.14em 0 var(--plate-edge);
 }
 /* a physical push when pressed */
 .contact-link:active {
@@ -36,6 +42,8 @@
 .contact-link:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px color-mix(in srgb, var(--color-dark) 24%, transparent);
 }
 
 /* a phone: no box of its own, so the icon, the text and the arrow are one row */
@@ -73,6 +81,8 @@
 @media (hover: hover) {
   .contact-link:hover {
     border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -10px color-mix(in srgb, var(--color-dark) 24%, transparent);
   }
   .contact-link:hover .contact-link__arrow {
     transform: translate(2px, -2px);
@@ -96,11 +106,11 @@
   transition: color var(--btn-color);
 }
 .contact-link:is(:focus-visible, :active) .contact-link__label {
-  color: var(--ink);
+  color: color-mix(in srgb, var(--plate-ink) 72%, transparent);
 }
 @media (hover: hover) {
   .contact-link:hover .contact-link__label {
-    color: var(--ink);
+    color: color-mix(in srgb, var(--plate-ink) 72%, transparent);
   }
 }
 .contact-link__value {
@@ -132,6 +142,7 @@
 
 /* the footer's social buttons: 44px squares, 8px apart (the list's gap) */
 .footer-social {
+  --on-plate: var(--plate-ink);
   position: relative;
   display: grid;
   place-items: center;
@@ -144,7 +155,17 @@
   border: 1px solid var(--line);
   transition:
     color var(--btn-color),
+    border-color 300ms var(--ease-out),
     transform 300ms var(--ease-out);
+}
+.footer-social::before {
+  background: var(--plate-bg);
+  box-shadow: inset 0 -0.14em 0 var(--plate-edge);
+}
+@media (hover: hover) {
+  .footer-social:hover {
+    border-color: transparent;
+  }
 }
 .footer-social:active {
   transform: scale(0.96);
