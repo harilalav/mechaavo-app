@@ -34,6 +34,11 @@ export interface FishView {
   length: number;
   /** Extra opacity multiplier (fades). */
   alpha: number;
+  /**
+   * 0 to 1: how much this fish must hide what lies under it (the lure, a DOM layer beneath the front canvas). Its own
+   * opacity is lifted toward 1 by this much, so a fish in front of the lure is not a window onto it. Optional: 0.
+   */
+  cover?: number;
 }
 
 export interface FishRenderer {
@@ -390,7 +395,8 @@ export function createProceduralFishRenderer(
     draw(ctx, fish, view) {
       // a fish swinging end-on to the camera softens into the water instead of showing a stubby silhouette
       const endOn = 0.62 + 0.38 * Math.min(1, Math.max(0, (fish.turn - MIN_TURN) / (0.85 - MIN_TURN)));
-      const alpha = fish.opacity * view.alpha * endOn;
+      const own = fish.opacity * endOn;
+      const alpha = (own + (1 - own) * (view.cover ?? 0)) * view.alpha;
       if (alpha <= 0.004 || view.length < 2) return;
 
       if (fish.species === "bait") {

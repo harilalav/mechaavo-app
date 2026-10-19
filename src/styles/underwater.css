@@ -746,19 +746,38 @@
 }
 /*
  * A soft wash of the page color behind the words keeps them legible over the
- * rays and the water; it fades in and out with the text. Both leave as the camera sinks under the catalog:
- * heroTimeline.ts writes `--leave` on the slot (its own opacity is the catch's), read here and by the
- * words' wrapper.
+ * water; it fades in and out with the text. Both leave as the camera sinks under the catalog:
+ * heroTimeline.ts writes `--leave` on the slot (its own opacity is the catch's) and on the wash (below),
+ * read by the words' wrapper and by the wash.
  */
 .hero-statement-fade {
   opacity: var(--leave, 1);
 }
-.hero-statement-slot::before {
+/*
+ * The wash is a layer of its own, UNDER the canvases (--z-light, before the back canvas), not the slot's
+ * ::before: the slot sits above the front canvas, so the page-coloured wash lay over the caught fish and
+ * thinned its blue to a pale lavender the moment it was hooked (client review 2026-10-19). Here the fish are
+ * drawn over it and keep their colour; it still lifts the water behind the words (the shafts and the caustic
+ * light above it only add light, which a dark word does not mind). The wrapper arrives with the catch, the
+ * ::before leaves with the camera's sink (`--leave`, written by heroTimeline.ts on this element; not
+ * transitioned, it follows the scrub).
+ */
+.hero-statement-wash {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-light);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease-out;
+}
+.hero-root[data-caught] .hero-statement-wash {
+  opacity: 1;
+  transition: opacity 260ms ease-out;
+}
+.hero-statement-wash::before {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
-  pointer-events: none;
   opacity: var(--leave, 1);
   background: radial-gradient(
     ellipse 58% 62% at 16% 26%,
@@ -1096,11 +1115,21 @@
 /* (the split layout is the base: the lure slot, the copy slot and the nav above; a laptop width widens the lure's share at 1280px) */
 
 @media (max-width: 767px), (max-aspect-ratio: 1/1) {
-  /* lure below the copy, a touch below the middle; the hero fish swims in beside it */
+  /*
+   * Lure below the copy, a touch below the middle; the hero fish swims in beside it. The slot is as tall as the
+   * screen and centres the lure, so its padding-top puts the lure's centre at (100svh + padding) / 2: 58svh
+   * here. The copy above is placed from the top, not from the height, so on a short phone (375 x 548) the
+   * lure came to rest under the call to action. --copy-end is where the copy ends (the call to action's
+   * bottom: the padding, kicker, two title lines that scale with the width, tagline, button; fitted to
+   * measured positions, e2e "the lure at rest in the stacked layout" holds it), and the lure's centre is never
+   * nearer than half a lure plus a gap below it.
+   */
   .hero-lure-slot {
+    --copy-end: calc(14.7rem + min(18.3vw, 8rem));
+    --lure-clear: 3.5rem;
     left: 38%;
     width: clamp(8.125rem, 28vw, 10.9375rem);
-    padding-top: 16svh;
+    padding-top: max(16svh, calc(2 * (var(--copy-end) + var(--lure-clear)) - 100svh));
   }
   .hero-copy-slot {
     align-items: flex-start;
@@ -1135,7 +1164,7 @@
   .hero-statement-slot {
     padding-top: 6.5rem;
   }
-  .hero-statement-slot::before {
+  .hero-statement-wash::before {
     background: linear-gradient(
       to bottom,
       color-mix(in srgb, var(--page) 86%, transparent) 0%,
@@ -1153,10 +1182,12 @@
   .hero-support {
     margin-top: 1.5rem;
   }
+  /* the supporting paragraph is on screen here, so the copy ends lower (about 29rem at 640 to 30rem from 768; this is the upper bound) */
   .hero-lure-slot {
+    --copy-end: 30rem;
     left: 35%;
     width: clamp(8.75rem, 24vw, 11.875rem);
-    padding-top: 22svh;
+    padding-top: max(22svh, calc(2 * (var(--copy-end) + var(--lure-clear)) - 100svh));
   }
 }
 
@@ -1214,6 +1245,10 @@
   }
   .hero-statement {
     font-size: clamp(1.75rem, min(11vw, 12svh), 3rem);
+  }
+  /* the copy is tighter here (smaller title, less padding), so it ends higher; the title caps at 2.75rem */
+  .hero-lure-slot {
+    --copy-end: calc(12.2rem + min(18.3vw, 5.5rem));
   }
 }
 /*

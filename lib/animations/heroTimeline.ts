@@ -55,8 +55,10 @@ interface HeroElements {
   depth: HTMLElement | null;
   /** What leaves as the camera sinks: boxes with no other owner of their opacity (the captions' container, the lure's fade wrapper, the hero's own nav). */
   leaving: HTMLElement[];
-  /** The statement's slot: its own opacity is the catch's (data-caught), so it gets `--leave`, read by its fade wrapper and its wash. */
+  /** The statement's slot: its own opacity is the catch's (data-caught), so it gets `--leave`, read by its fade wrapper. */
   statementSlot: HTMLElement | null;
+  /** The wash behind the statement (under the canvases, a layer of its own): the same `--leave`. */
+  statementWash: HTMLElement | null;
   rays: HTMLElement | null;
   beams: HTMLElement[];
   haze: HTMLElement | null;
@@ -78,6 +80,7 @@ function collect(root: HTMLElement): HeroElements {
     depth: root.querySelector<HTMLElement>(".hero-depth"),
     leaving: Array.from(root.querySelectorAll<HTMLElement>(".hero-captions, .hero-lure-fade, .hero-nav")),
     statementSlot: root.querySelector<HTMLElement>(".hero-statement-slot"),
+    statementWash: root.querySelector<HTMLElement>(".hero-statement-wash"),
     rays: one("rays"),
     beams: all("beam"),
     haze: one("haze"),
@@ -308,6 +311,7 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
     }
     for (const node of el.leaving) node.style.opacity = leave;
     el.statementSlot?.style.setProperty("--leave", leave);
+    el.statementWash?.style.setProperty("--leave", leave);
   };
   const sink = sheet
     ? gsap.to(sinking, {
@@ -426,6 +430,7 @@ export function createHeroTimeline({ root, track, scene, stacked }: HeroTimeline
     el.depth?.style.removeProperty("opacity");
     for (const node of el.leaving) node.style.removeProperty("opacity");
     el.statementSlot?.style.removeProperty("--leave");
+    el.statementWash?.style.removeProperty("--leave");
     resetHeroScene(scene);
   };
 }

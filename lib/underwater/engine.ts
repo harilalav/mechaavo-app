@@ -184,7 +184,7 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
   let renderer: FishRenderer = createProceduralFishRenderer(palette, quality.segments);
   let proceduralRenderer = renderer;
   let rendererSegments = quality.segments;
-  const view: FishView = { x: 0, y: 0, length: 0, alpha: 1 };
+  const view: FishView = { x: 0, y: 0, length: 0, alpha: 1, cover: 0 };
   const proj = { x: 0, y: 0, s: 1 };
   const simContext: SimContext = {
     dt: 0,
@@ -639,6 +639,16 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     return Math.max(0.3, fade);
   };
 
+  /**
+   * 1 where a fish whose body is centred at (x, y) lies over the lure, easing to 0 a little way off it: how solid it
+   * must be so that the lure does not show through it (the lure is a DOM layer under the front canvas).
+   */
+  const coverOfLure = (x: number, y: number, length: number): number => {
+    const reach = (lure.length + length) * 0.5;
+    // the lure and a fish are long and low: a miss in height counts for more than one in length
+    return 1 - smoothstep(1.05, 1.5, Math.hypot(x - lure.centerX, (y - lure.centerY) * 2.2) / reach);
+  };
+
   /** Draw one fish; returns its on-screen length, or 0 when it was off screen or faded out. */
   const drawFish = (ctx: CanvasRenderingContext2D, fish: Fish): number => {
     project(fish.x, fish.y, fish.depth);
@@ -659,15 +669,21 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
       }
     }
     if (alpha <= 0.004) return 0;
+    // a fish on the near side of the lure's plane is drawn above the lure (the front canvas), and its opacity is under 1:
+    // the lure's body and hooks showed through it as a ghost. Over the lure it is solid. The near tier does not need it
+    // (it dissolves as it nears the lure, above); a fish behind the lure's plane is under the lure and is covered by it.
+    const cover = lureValid && fish.tier !== "near" && fish.depth >= Z_LURE ? coverOfLure(bodyX, proj.y, length) : 0;
     view.x = proj.x;
     view.y = proj.y;
     view.length = length;
     view.alpha = alpha;
+    view.cover = cover;
     renderer.draw(ctx, fish, view);
     return length;
   };
 
   const drawPrimary = (ctx: CanvasRenderingContext2D, fish: Fish, blur: boolean) => {
+    view.cover = 0;
     view.length = fish.scale * world.unit * lure.scale * fish.persp;
     if (blur) {
       // motion blur on the strike: a few ghosts along the path it just took
@@ -682,6 +698,11 @@ export function createUnderwaterEngine(options: EngineOptions): UnderwaterEngine
     view.y = fish.y;
     view.alpha = primaryFade(fish, view.length) * catchAlpha;
     if (view.alpha <= 0.004) return;
+    // before the strike the hero fish, softened when it swings end-on, is a window onto the lure behind it: solid over
+    // it. From the strike on the lure is going into its mouth (and fades there): that is the fish's own business.
+    const mode = pop?.brain.mode;
+    const engaged = mode === "strike" || mode === "hooked" || mode === "release";
+    view.cover = lureValid && !engaged && fish.depth >= Z_LURE ? coverOfLure(fish.x - fish.facing * view.length * 0.45, fish.y, view.length) : 0;
     renderer.draw(ctx, fish, view);
   };
 

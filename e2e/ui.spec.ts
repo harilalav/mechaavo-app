@@ -946,6 +946,195 @@ test.describe("the catalog rises through the hero's water", () => {
   });
 });
 
+test.describe("the lure at rest in the stacked layout", () => {
+  // Phones and near-square portrait screens, heights as a browser really shows them. The slot used to be placed
+  // from the screen's height (58svh) while the copy above it is placed from the top, so on a short phone the lure
+  // sat under the call to action (375 x 548: all but a sliver of it behind the button). Run once, on the phone project.
+  const SCREENS: Array<[number, number]> = [
+    [320, 480],
+    [360, 560],
+    [375, 548],
+    [360, 640],
+    [375, 667],
+    [390, 664],
+    [412, 915],
+    [673, 841],
+    [700, 720],
+  ];
+  for (const [w, h] of SCREENS) {
+    test(`${w} x ${h}: the lure floats clear of the call to action`, async ({ page }, info) => {
+      test.skip(info.project.name !== "phone", "one project is enough: it sets its own screen");
+      await page.setViewportSize({ width: w, height: h });
+      await openHome(page);
+      await page.waitForSelector(".hero-root[data-lure]", { timeout: 15_000 });
+      await page.waitForTimeout(4500); // the swim in from the logo is over
+      // the lure floats a few pixels: the closest it comes over a second
+      let gap = Infinity;
+      let box: { lureTop: number; lureBottom: number; ctaBottom: number } | null = null;
+      for (let i = 0; i < 4; i++) {
+        const m = await page.evaluate(() => {
+          const l = document.querySelector(".hero-lure__pull")!.getBoundingClientRect();
+          const c = document.querySelector(".hero-cta")!.getBoundingClientRect();
+          return { lureTop: l.top, lureBottom: l.bottom, ctaBottom: c.bottom, vh: window.innerHeight };
+        });
+        if (m.lureTop - m.ctaBottom < gap) {
+          gap = m.lureTop - m.ctaBottom;
+          box = m;
+        }
+        expect(m.lureBottom, "the whole lure is on the screen").toBeLessThanOrEqual(m.vh);
+        await page.waitForTimeout(300);
+      }
+      expect(gap, `lure ${JSON.stringify(box)}`).toBeGreaterThanOrEqual(8);
+    });
+  }
+});
+
+test.describe("the ink plate on a contact tile fills it", () => {
+  // The plate is skewed by the heading's lean and was only 0.5rem wider than its button: right for a 44px button (the
+  // lean moves its ends 3.5px), but on a tile a few hundred px tall the lean moves them by tens of px and two white
+  // wedges stayed open at the top left and the bottom right; and the tile's 1px border went transparent on hover, a
+  // white frame round the ink (client, 2026-10-19).
+  test("hovered, the tile is ink from corner to corner, border included", async ({ page }, info) => {
+    await openHome(page);
+    const hovers = await page.evaluate(() => window.matchMedia("(hover: hover)").matches);
+    test.skip(!hovers, "the plate is a pointer's hover; touch shows it on press only");
+    await page.evaluate(() => document.getElementById("contact")!.scrollIntoView({ behavior: "instant" }));
+    await page.waitForTimeout(2500); // the tiles have surfaced
+    const tile = page.locator(".contact-link").first();
+    await tile.hover();
+    await page.waitForTimeout(1500); // the wipe has landed
+    const r = await tile.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      return { x: b.left, y: b.top, w: b.width, h: b.height };
+    });
+    const shot = await cssShot(page);
+    await info.attach("contact-tile-hover", { body: shot, contentType: "image/png" });
+    const probes = [
+      ["top left, inside the border", r.x + 3, r.y + 3],
+      ["top right, inside the border", r.x + r.w - 4, r.y + 3],
+      ["bottom left, above the foot", r.x + 3, r.y + r.h - 14],
+      ["bottom right, above the foot", r.x + r.w - 4, r.y + r.h - 14],
+      ["the border, left", r.x + 0.5, r.y + r.h / 2],
+      ["the border, top", r.x + r.w / 2, r.y + 0.5],
+    ] as const;
+    const px = await samplePixels(page, shot, probes.map(([, x, y]) => ({ x, y, w: 1, h: 1 })), 1);
+    probes.forEach(([name], i) => {
+      expect(luminance(px[i][0] as RGB), `${name} is ink: ${JSON.stringify(px[i][0])}`).toBeLessThan(0.05);
+    });
+  });
+});
+
+test.describe("the ink-dipped letters", () => {
+  // The letters run from ink at the top to the brand blue at the bottom (tide.css: --tide-blue-at), within the palette and
+  // the contrast budget: ui-ux-pro-max asks 4.5:1 for text and 3:1 for large text, the taste skill no excessive gradient
+  // text on large headers. The blue was held so far down that the baseline sat at 7:1 and read as plain navy.
+  test("the baseline is visibly blue and still 4.5:1 on its ground; the tail of a descender 3:1", async ({ page }, info) => {
+    test.skip(info.project.name !== "laptop", "one project is enough: the colours are the same everywhere");
+    await page.addInitScript(() => localStorage.setItem("mechaavo-snap", "off"));
+    await page.goto("/", { waitUntil: "load" });
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => document.getElementById("principles")!.scrollIntoView({ behavior: "instant" }));
+    await page.waitForTimeout(4000);
+    const w = await page.evaluate(() => {
+      const i = [...document.querySelectorAll<HTMLElement>("#principles .tide__i")].find((e) => e.textContent === "performance")!;
+      const r = i.getBoundingClientRect();
+      const cs = getComputedStyle(i);
+      return { x: r.left, y: r.top, w: r.width, fs: parseFloat(cs.fontSize), lh: parseFloat(cs.lineHeight) };
+    });
+    const shot = await cssShot(page);
+    const ground = (await samplePixels(page, shot, [{ x: w.x - 20, y: w.y + 2, w: 1, h: 1 }], 1))[0][0] as RGB;
+    // the glyph pixels of a band: the ones far from the ground in luminance (not the anti-aliased edges), averaged
+    const band = async (fromEm: number, toEm: number) => {
+      const px = (await samplePixels(page, shot, [{ x: w.x, y: w.y + fromEm * w.fs, w: w.w, h: (toEm - fromEm) * w.fs }], 1))[0] as RGB[];
+      const g = px.filter((p) => Math.abs(luminance(p) - luminance(ground)) > 0.6);
+      expect(g.length, `glyph pixels between ${fromEm}em and ${toEm}em`).toBeGreaterThan(20);
+      const m = [0, 1, 2].map((k) => g.reduce((s, p) => s + p[k], 0) / g.length) as RGB;
+      return m;
+    };
+    // the baseline sits about 0.85em below the top of the line (line-height 1); the tail of the p reaches 1.05em
+    const baseline = await band(0.8, 0.87);
+    const tail = await band(0.97, 1.03);
+    info.annotations.push({ type: "baseline", description: `rgb(${baseline.map(Math.round)}) ${contrast(baseline, ground).toFixed(2)}:1; tail rgb(${tail.map(Math.round)}) ${contrast(tail, ground).toFixed(2)}:1` });
+    expect(baseline[2] - baseline[0], `the baseline is blue (rgb ${baseline.map(Math.round)})`).toBeGreaterThanOrEqual(135);
+    expect(contrast(baseline, ground), "the baseline reads at 4.5:1").toBeGreaterThanOrEqual(4.5);
+    expect(contrast(tail, ground), "the tail of a descender reads at 3:1").toBeGreaterThanOrEqual(3);
+  });
+});
+
+test.describe("heading descenders are not cut", () => {
+  // A Tide word is an inline-block as tall as its line (1em in the principles) and its letters are painted with
+  // `background-clip: text`, which only paints inside that box: Raleway's descender (g, p, y) reaches about 0.21em under
+  // the baseline and the box ends about 0.15em under it, so the tail was sliced flat (client, 2026-10-19).
+  test("the g of 'design' and of 'Strength' goes on below the word's line box", async ({ page }, info) => {
+    test.skip(info.project.name !== "laptop", "one project is enough: the box is the same everywhere");
+    await openHome(page);
+    await page.evaluate(() => document.getElementById("principles")!.scrollIntoView({ behavior: "instant" }));
+    await page.waitForTimeout(4000); // the rows have surfaced and the headings have played
+    const words = await page.evaluate(() =>
+      ["design", "Strength"].map((t) => {
+        const i = [...document.querySelectorAll<HTMLElement>("#principles .tide__i")].find((e) => e.textContent === t)!;
+        const r = i.getBoundingClientRect();
+        const cs = getComputedStyle(i);
+        // the line's bottom: the word's box now grows below it by its padding (and the margin takes that back)
+        return { t, x: r.left, w: r.width, bottom: r.bottom - parseFloat(cs.paddingBottom), fs: parseFloat(cs.fontSize) };
+      }),
+    );
+    const shot = await cssShot(page);
+    for (const w of words) {
+      // the strip just under the box, 0.02em to 0.07em down: only a descender is there (the plate, when there is one,
+      // stops at the box; the tail below it is ink)
+      const [strip] = await samplePixels(page, shot, [{ x: w.x, y: w.bottom + 0.02 * w.fs, w: w.w, h: 0.05 * w.fs }], 1);
+      // ink or blue, anything clearly not the pale page (the tail is the blue end of the letters' gradient now)
+      const dark = strip.filter(([r, g, b]) => luminance([r, g, b]) < 0.45).length;
+      expect(dark, `letter pixels of ${w.t}'s descender under its box`).toBeGreaterThanOrEqual(8);
+    }
+  });
+});
+
+test.describe("a fish in front of the lure hides it", () => {
+  // The lure is a DOM layer between the two canvases; a fish on the near side of its plane (a visitor on the front half
+  // of its loop) is drawn on the front canvas, above the lure, at 0.8 to 0.94 opacity: the lure's body and hooks showed
+  // through it as a ghost (client, 2026-10-19). Where a front fish covers the lure its pixels must be solid.
+  test("where a fish covers the lure its pixels are opaque, not a see-through ghost", async ({ page }, info) => {
+    test.skip(info.project.name !== "phone", "one project is enough: it sets its own screen");
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 642, height: 1396 });
+    await openHome(page);
+    await page.evaluate(() => window.scrollTo(0, Math.round(window.innerHeight * 0.3)));
+    await page.waitForTimeout(2500);
+    const frames: Array<{ covered: number; ghost: number }> = [];
+    for (let i = 0; i < 200 && frames.length < 4; i++) {
+      const m = await page.evaluate(() => {
+        const lure = document.querySelector(".hero-lure__pull")!.getBoundingClientRect();
+        const c = document.querySelector<HTMLCanvasElement>(".hero-canvas--front")!;
+        const cr = c.getBoundingClientRect();
+        const kx = c.width / cr.width;
+        const ky = c.height / cr.height;
+        const x0 = Math.max(0, Math.floor((lure.left - cr.left) * kx));
+        const y0 = Math.max(0, Math.floor((lure.top - cr.top) * ky));
+        const w = Math.max(1, Math.min(c.width - x0, Math.floor(lure.width * kx)));
+        const h = Math.max(1, Math.min(c.height - y0, Math.floor(lure.height * ky)));
+        const d = c.getContext("2d")!.getImageData(x0, y0, w, h).data;
+        let n = 0;
+        let covered = 0;
+        let ghost = 0;
+        for (let p = 3; p < d.length; p += 4) {
+          n++;
+          if (d[p] > 10) covered++;
+          if (d[p] > 10 && d[p] < 235) ghost++;
+        }
+        return { covered: covered / n, ghost: covered ? ghost / covered : 0 };
+      });
+      // a fish over the lure (the line, a bubble or a mote would cover far less of its box)
+      if (m.covered >= 0.35) frames.push(m);
+      await page.waitForTimeout(400);
+    }
+    expect(frames.length, "a front fish crossed the lure at least four times while watching").toBeGreaterThanOrEqual(4);
+    const worst = Math.max(...frames.map((f) => f.ghost));
+    expect(worst, `share of the covered pixels that let the lure show through: ${JSON.stringify(frames)}`).toBeLessThan(0.4);
+  });
+});
+
 test.describe("the nav stays visible on the water and on the page", () => {
   test("links are full ink; hover is an ink plate with a white label (the cyan one was lost on the azure)", async ({ page }) => {
     test.skip(!!(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)), "hover needs a fine pointer");
