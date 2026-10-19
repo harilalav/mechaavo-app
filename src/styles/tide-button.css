@@ -46,11 +46,15 @@
     box-shadow 300ms var(--ease-out);
 }
 
-/* the plate: wider than the button so the skewed ends never leave a gap */
+/*
+ * the plate: wider than the button so the skewed ends never leave a gap. The lean moves the plate's top and bottom
+ * edges sideways by (height / 2) * tan(9deg), about 0.08 of the height: 3.5px on a 44px button, which 0.5rem covers,
+ * but tens of px on a tall tile, so a tile sets --plate-over to a share of its own width (contact.css).
+ */
 .tide-btn::before {
   content: "";
   position: absolute;
-  inset: 0 -0.5rem;
+  inset: 0 calc(-1 * var(--plate-over, 0.5rem));
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(100deg, var(--color-primary) 0%, var(--color-accent-secondary) 100%);

@@ -55,6 +55,15 @@
   --plate-edge: var(--accent);
   /* the payoff word's colour before the plate reaches it: white type cannot wait on a white page (client review 2026-10-16) */
   --mark-pre: var(--ink);
+  /*
+   * Where the letters' blue stop lies, as a share of the word's box, which runs a little past the baseline (the box now
+   * grows 0.14em below the line for the descenders). The smaller it is, the earlier the letters turn blue: at 112% the
+   * baseline of a 1em line is about 0.58 of the way from ink to the brand blue (rgb 5,110,155 on the ink and primary
+   * tokens: 4.6:1 on the gray band, 5.3 on white) and the tail of a g or p about 0.8 (3.1:1, a tail is large text).
+   * Was 150% (baseline 7:1, which read as plain navy); client review 2026-10-19: "the gradient is not that visible".
+   * The hero's own gradient (underwater.css) is not this one: it sits on the water, where the copy's contrast is tighter.
+   */
+  --tide-blue-at: 112%;
 }
 
 /* an explicit line, like the hero's */
@@ -79,19 +88,27 @@
 .tide__i {
   display: inline-block;
   transform-origin: 0 100%;
+  /*
+   * The letters are painted with background-clip: text (below), which paints only inside the word's box, and that box
+   * is as tall as the line (1em in the principles). Raleway's descenders (g, p, y) reach about 0.21em under the
+   * baseline and such a box ends about 0.15em under it, so the tails were sliced flat (client review 2026-10-19).
+   * The box grows down by the padding and the margin takes the same back: nothing moves, the paint area is taller.
+   */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
 }
 
 /*
  * Letter fill: ink dipped in the water. The blue stop sits past the end of the
- * letter (170% of the word's box; the glyphs end near 83% of it), so the baseline
- * is only about 40% of the way there and stays above 5:1. `tide--flat` opts out.
+ * letter (--tide-blue-at, on :root, the one place to tune it; the baseline is about
+ * 0.58 of the way there and stays above 4.5:1). `tide--flat` opts out.
  * The clip is on each word, so every word gets the same vertical fade.
  */
 .tide__i {
   background: linear-gradient(
     180deg,
     var(--color-dark) 22%,
-    var(--color-primary) calc(150% + (1 - var(--tide-dip)) * 500%)
+    var(--color-primary) calc(var(--tide-blue-at) + (1 - var(--tide-dip)) * 500%)
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -148,6 +165,22 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+}
+/*
+ * A plate word's descender (the g of Strength, the p of purpose) goes on below the plate's foot, where white would be
+ * white on the page and read as cut off: below the foot the tail is ink, like the rest of the heading. The foot is the
+ * plate's own (0.01em above the line's bottom: `inset` below), which in the word's grown box (above) is 0.15em up.
+ */
+@media (forced-colors: none) {
+  .tide .tide__mark .tide__i {
+    background-image:
+      linear-gradient(to bottom, transparent calc(100% - 0.15em), var(--mark-pre) calc(100% - 0.15em)),
+      linear-gradient(
+        calc(90deg - var(--tide-wipe) * var(--tide-skew)),
+        var(--plate-ink) calc(var(--tide-wipe) * 100% + (2 * var(--tide-wipe) - 1) * 0.07em),
+        var(--mark-pre) calc(var(--tide-wipe) * 100% + (2 * var(--tide-wipe) - 1) * 0.07em)
+      );
   }
 }
 /*

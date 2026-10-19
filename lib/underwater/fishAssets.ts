@@ -60,7 +60,7 @@ export function createSpriteFishRenderer(
         fallback.draw(ctx, fish, view);
         return;
       }
-      const alpha = fish.opacity * view.alpha;
+      const alpha = (fish.opacity + (1 - fish.opacity) * (view.cover ?? 0)) * view.alpha;
       if (alpha <= 0.004) return;
 
       const sprite = sprites[fish.id % sprites.length];

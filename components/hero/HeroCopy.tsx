@@ -70,6 +70,10 @@ export function HeroCopy() {
         </div>
       </div>
 
+      {/* the page-coloured lift behind the statement: a layer of its own UNDER the canvases (underwater.css), so the
+          caught fish is drawn over it and keeps its colour; it used to be the slot's ::before, over the fish */}
+      <div className="hero-statement-wash" aria-hidden="true" />
+
       <div className="hero-statement-slot">
         {/* the statement leaves as the camera sinks under the catalog (heroTimeline.ts writes this wrapper's
             opacity: the slot's own belongs to the catch, data-caught) */}

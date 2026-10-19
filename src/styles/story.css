@@ -209,18 +209,26 @@
   transition:
     background-color 300ms var(--ease-out),
     color 300ms var(--ease-out),
-    border-color 300ms var(--ease-out);
+    border-color 300ms var(--ease-out),
+    box-shadow 300ms var(--ease-out);
 }
-/* the rows are not controls, so the cue is for a pointer only: a tap would leave it stuck */
+/*
+ * The rows are not controls, so the cue is for a pointer only: a tap would leave it stuck. The mark wears the
+ * heading's ink plate (white icon on ink, the accent along the foot), like the footer's social squares, the nav
+ * links and the contact tiles do: it had the old full cyan fill, the one hover left that did not match them
+ * (client review 2026-10-19). The row's own tint stays light: an ink row behind a display line would fight the
+ * payoff word's plate.
+ */
 @media (hover: hover) {
   .principle:hover::before {
     opacity: 1;
     transform: none;
   }
   .principle:hover .principle__mark {
-    color: var(--on-accent);
-    background-color: var(--accent);
-    border-color: var(--accent);
+    color: var(--plate-ink);
+    background-color: var(--plate-bg);
+    border-color: var(--plate-bg);
+    box-shadow: inset 0 -0.14em 0 var(--plate-edge);
   }
 }
 @media (prefers-reduced-motion: reduce) {
